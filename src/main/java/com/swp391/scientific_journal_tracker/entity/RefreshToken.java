@@ -24,6 +24,6 @@ public class RefreshToken {
     private String token;
     @Column(name = "ExpiredAt", nullable = false)
     private LocalDateTime expiredAt;
-    @Column(name = "CreatedAt", nullable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @Column(name = "CreatedAt", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime createdAt;
 }

@@ -20,7 +20,7 @@ public class User {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     @Column(name = "UserId", nullable = false, unique = true)
-    private Long id;
+    private Long userId;
     @Column(name = "Name", nullable = false, columnDefinition = "VARCHAR(100) COLLATE utf8mb4_unicode_ci")
     private String name;
     @Column(name = "Email", nullable = false, unique = true, columnDefinition = "VARCHAR(150) COLLATE utf8mb4_unicode_ci")
