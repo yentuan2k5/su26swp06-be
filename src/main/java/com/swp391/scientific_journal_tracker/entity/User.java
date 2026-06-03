@@ -12,10 +12,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "Users")
-@AllArgsConstructor
-@NoArgsConstructor
-@Data
+@Table(name = "Users") // Table name in plural form
+@AllArgsConstructor // Constructor with all fields
+@NoArgsConstructor // Default constructor
+@Data // Getters, Setters, toString, equals, and hashCode
 public class User {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
