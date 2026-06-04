@@ -29,5 +29,4 @@ public class Bookmark {
     private Long paperId;
     @Column(name = "SavedAt", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime savedAt;
-
 }
