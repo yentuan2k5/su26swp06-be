@@ -22,6 +22,6 @@ public class Keyword {
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     @Column(name = "KeywordId", nullable = false, unique = true)
     private Long keywordId;
-    @Column(name = "Term", nullable = false, unique = true, columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Term", nullable = false, unique = true, columnDefinition = "VARCHAR(100) COLLATE utf8mb4_unicode_ci")
     private String term;
 }

@@ -22,12 +22,12 @@ public class Notification {
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     @Column(name = "NotificationId", nullable = false, unique = true)
     private Long notificationId;
-    @Column(name = "UserID")
+    @Column(name = "UserID", nullable = false)
     private Long userId;
     @Column(name = "Message", nullable = false)
     private String message;
-    @Column(name = "IsRead", nullable = false)
+    @Column(name = "IsRead", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
     private boolean isRead = false;
     @Column(name = "SendAt", nullable = false, insertable = false, updatable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private LocalDateTime sendAt;
+    private LocalDateTime sendAt = LocalDateTime.now();
 }

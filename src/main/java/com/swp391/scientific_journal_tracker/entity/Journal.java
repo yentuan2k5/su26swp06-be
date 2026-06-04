@@ -24,7 +24,7 @@ public class Journal {
     private String title;
     @Column(name = "ISSN", nullable = false, unique = true, columnDefinition = "VARCHAR(20) COLLATE utf8mb4_unicode_ci")
     private String issn;
-    @Column(name = "Publisher", columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Publisher", columnDefinition = "VARCHAR(150) COLLATE utf8mb4_unicode_ci")
     private String publisher;
     @Column(name = "Field", columnDefinition = "VARCHAR(100) COLLATE utf8mb4_unicode_ci")
     private String field;

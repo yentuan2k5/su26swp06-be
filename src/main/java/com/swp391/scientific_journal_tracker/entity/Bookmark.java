@@ -28,5 +28,5 @@ public class Bookmark {
     @Column(name = "PaperId", nullable = false)
     private Long paperId;
     @Column(name = "SavedAt", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private LocalDateTime savedAt;
+    private LocalDateTime savedAt = LocalDateTime.now();
 }

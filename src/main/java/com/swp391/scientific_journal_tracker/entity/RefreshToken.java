@@ -20,10 +20,10 @@ public class RefreshToken {
     private Long refreshTokenId;
     @Column(name = "UserID", nullable = false)
     private Long userId;
-    @Column(name = "Token", nullable = false, columnDefinition = "VARCHAR(512) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Token", nullable = false, unique = true, columnDefinition = "VARCHAR(512) COLLATE utf8mb4_unicode_ci")
     private String token;
     @Column(name = "ExpiredAt", nullable = false)
     private LocalDateTime expiredAt;
     @Column(name = "CreatedAt", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

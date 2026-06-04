@@ -25,8 +25,8 @@ public class DashboardReport {
     private Long userId;
     @Column(name = "Count", nullable = false, columnDefinition = "VarChar(255) COLLATE utf8mb4_unicode_ci")
     private String title;
-    @Column(name = "Content", nullable = false, columnDefinition = "Text COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Content", columnDefinition = "Text COLLATE utf8mb4_unicode_ci")
     private String content;
     @Column(name = "GeneratedAt", nullable = false, insertable = false, updatable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private LocalDateTime generatedAt;
+    private LocalDateTime generatedAt = LocalDateTime.now();
 }

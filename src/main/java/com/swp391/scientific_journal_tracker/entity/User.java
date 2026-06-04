@@ -1,5 +1,7 @@
 package com.swp391.scientific_journal_tracker.entity;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,10 +28,10 @@ public class User {
     @Column(name = "Email", nullable = false, unique = true, columnDefinition = "VARCHAR(150) COLLATE utf8mb4_unicode_ci")
     private String email;
     @Column(name = "Password", nullable = false, columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
-    private String password;
+    private String passwordHash;
     @Enumerated(EnumType.STRING)
     @Column(name = "Role", nullable = false)
-    private Role role;
+    private Role role = Role.STUDENT; // Default role is STUDENT
 
     public enum Role {
         ADMIN,
@@ -37,4 +39,7 @@ public class User {
         STUDENT,
         RESEARCHER
     }
+
+    @Column(name = "CreatedAt", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

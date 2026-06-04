@@ -19,7 +19,7 @@ public class ResearchPaper {
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     @Column(name = "ResearchPaperId", nullable = false, unique = true)
     private Long researchPaperId;
-    @Column(name = "ExternalId", nullable = false, unique = true)
+    @Column(name = "ExternalId", unique = true, columnDefinition = "VARCHAR(100) COLLATE utf8mb4_unicode_ci")
     private String externalId; // ID from external data source
     @Column(name = "Title", nullable = false, columnDefinition = "VARCHAR(500) COLLATE utf8mb4_unicode_ci")
     private String title;
@@ -27,11 +27,11 @@ public class ResearchPaper {
     private String abstractText; // 'abstract' is a reserved keyword in Java
     @Column(name = "Year")
     private Integer year;
-    @Column(name = "Doi", columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Doi", columnDefinition = "VARCHAR(200) COLLATE utf8mb4_unicode_ci")
     private String doi; // Digital Object Identifier
-    @Column(name = "CitationCount", nullable = false)
+    @Column(name = "CitationCount", nullable = false, columnDefinition = "INT DEFAULT 0")
     private Integer citationCount = 0;// Default to 0 if not provided
-    @Column(name = "SourceApi", nullable = false, columnDefinition = "VARCHAR(500) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "SourceApi", nullable = false, columnDefinition = "VARCHAR(50) COLLATE utf8mb4_unicode_ci")
     private String sourceApi = "semantic_scholar"; // URL to the paper, if available
     @Column(name = "Authors", columnDefinition = "VARCHAR(1000) COLLATE utf8mb4_unicode_ci")
     private String authors;
