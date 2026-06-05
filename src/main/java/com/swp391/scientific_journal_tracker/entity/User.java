@@ -1,13 +1,20 @@
 package com.swp391.scientific_journal_tracker.entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -42,4 +49,18 @@ public class User {
 
     @Column(name = "CreatedAt", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime createdAt = LocalDateTime.now();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RefreshToken> refreshTokens = new ArrayList<>();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Bookmark> bookmarks = new ArrayList<>();
+    @ManyToMany
+    @JoinTable(name = "user_following_journals", joinColumns = @JoinColumn(name = "UserId"), inverseJoinColumns = @jakarta.persistence.JoinColumn(name = "journalId"))
+    private List<Journal> followingJournals = new ArrayList<>();
+    @ManyToMany
+    @JoinTable(name = "user_following_topics", joinColumns = @JoinColumn(name = "UserId"), inverseJoinColumns = @JoinColumn(name = "ResearchTopicId"))
+    private List<ResearchTopic> followingTopics = new ArrayList<>();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Notification> notifications = new ArrayList<>();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DashboardReport> dashboardReports = new ArrayList<>();
 }

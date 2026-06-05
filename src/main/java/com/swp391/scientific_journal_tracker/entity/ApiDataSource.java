@@ -1,12 +1,15 @@
 package com.swp391.scientific_journal_tracker.entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,4 +31,6 @@ public class ApiDataSource {
     private String baseUrl;
     @Column(name = "LastSyncTime", nullable = true)
     private LocalDateTime lastSyncTime;
+    @OneToMany(mappedBy = "apiDataSource", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private List<ResearchPaper> researchPapers = new ArrayList<>();
 }

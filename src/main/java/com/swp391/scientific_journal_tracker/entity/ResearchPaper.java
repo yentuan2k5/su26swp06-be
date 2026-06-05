@@ -1,9 +1,18 @@
 package com.swp391.scientific_journal_tracker.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -35,8 +44,17 @@ public class ResearchPaper {
     private String sourceApi = "semantic_scholar"; // URL to the paper, if available
     @Column(name = "Authors", columnDefinition = "VARCHAR(1000) COLLATE utf8mb4_unicode_ci")
     private String authors;
-    @Column(name = "JournalId")
-    private Long journalId;
-    @Column(name = "ApiSourceId")
-    private Long apiSourceId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "JournalId", insertable = false, updatable = false)
+    private Journal journal;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ApiDataSourceId", insertable = false, updatable = false)
+    private ApiDataSource apiDataSource;
+    @ManyToMany
+    @JoinTable(name = "paper_keywords", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "KeywordId"))
+    private List<Keyword> keywords = new ArrayList<>();
+    @ManyToMany(mappedBy = "researchPapers")
+    private List<ResearchTopic> researchTopics = new ArrayList<>();
+    @OneToMany(mappedBy = "researchPaper")
+    private List<Bookmark> bookmarks = new ArrayList<>();
 }
