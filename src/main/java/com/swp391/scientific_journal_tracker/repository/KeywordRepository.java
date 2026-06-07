@@ -9,7 +9,7 @@ import com.swp391.scientific_journal_tracker.entity.Keyword;
 
 @Repository
 public interface KeywordRepository extends JpaRepository<Keyword, Long> {
-    Optional<Keyword> findbyterm(String term);
+    Optional<Keyword> findByTerm(String term);
 
     List<Keyword> findByTermContainingIgnoreCase(String term);
 
