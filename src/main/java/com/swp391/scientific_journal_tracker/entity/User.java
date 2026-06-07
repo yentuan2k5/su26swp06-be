@@ -34,8 +34,19 @@ public class User {
     private String name;
     @Column(name = "Email", nullable = false, unique = true, columnDefinition = "VARCHAR(150) COLLATE utf8mb4_unicode_ci")
     private String email;
-    @Column(name = "Password", nullable = false, columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Password", nullable = true, columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
     private String passwordHash;
+    @Column(name = "Provider", nullable = false, columnDefinition = "VARCHAR(30) COLLATE utf8mb4_unicode_ci DEFAULT 'local'")
+    private String provider = "local";
+
+    @Column(name = "ProviderId", columnDefinition = "VARCHAR(100) COLLATE utf8mb4_unicode_ci")
+    private String providerId;
+    @Column
+    private String resetToken; // token reset password
+    @Column
+    private LocalDateTime resetTokenExpiry; // hết hạn sau 15 phút
+    @Column(name = "CreatAt", nullable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    private LocalDateTime creatAt = LocalDateTime.now();
     @Enumerated(EnumType.STRING)
     @Column(name = "Role", nullable = false)
     private Role role = Role.STUDENT; // Default role is STUDENT
