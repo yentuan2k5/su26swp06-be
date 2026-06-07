@@ -1,5 +1,21 @@
 package com.swp391.scientific_journal_tracker.repository;
+import java.util.List;
 
-public class SyncLogRepository {
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
+import com.swp391.scientific_journal_tracker.entity.SyncLog;
+import com.swp391.scientific_journal_tracker.entity.SyncLog.Status;
+
+@Repository
+public interface SyncLogRepository extends JpaRepository<SyncLog, Long> {
+    List<SyncLog> findByStatus(Status status);
+
+    List<SyncLog> findBySourceApi(String sourceApi);
+    
+    List<SyncLog> findBySourceApiOrderByStartedAtDesc(String sourceApi);
+
+    List<SyncLog> findAllByOrderByStartedAtDesc();
+
+    long countByStatus(Status status); 
 }
