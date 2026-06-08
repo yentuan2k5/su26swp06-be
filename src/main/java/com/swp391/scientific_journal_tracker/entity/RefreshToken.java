@@ -10,12 +10,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.*;
 
 @Entity
 @Table(name = "RefreshTokens")
-@lombok.AllArgsConstructor
-@lombok.NoArgsConstructor
-@lombok.Data
+@AllArgsConstructor
+@Data
+@NoArgsConstructor
 public class RefreshToken {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
@@ -24,7 +25,6 @@ public class RefreshToken {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "UserId", nullable = false)
     private User user;
-
     @Column(name = "Token", nullable = false, unique = true, columnDefinition = "VARCHAR(512) COLLATE utf8mb4_unicode_ci")
     private String token;
     @Column(name = "ExpiredAt", nullable = false)

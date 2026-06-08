@@ -1,4 +1,5 @@
 package com.swp391.scientific_journal_tracker.repository;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -16,5 +17,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByRole(Role role);
 
-    List<User> findByNameContainingIgnoreCase(String keyword);
+    List<User> findByUsernameContainingIgnoreCase(String keyword);
+
+    Optional<User> findByGoogleId(String providerId);
+
+    Optional<User> findByResetPasswordToken(String resetToken);
+
+    Optional<User> findByUsername(String username);
+
+    boolean existsByUsername(String username);
+
+    Optional<User> findByEmailOrUsername(String email, String username);
 }
