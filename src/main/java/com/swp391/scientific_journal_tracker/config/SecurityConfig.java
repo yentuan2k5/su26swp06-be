@@ -161,8 +161,9 @@ public class SecurityConfig {
 
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:5173",
-                frontendUrl.replaceAll("/$", ""),
-                "https://*.vercel.app"));
+                "http://localhost:*",
+                "https://*.vercel.app",
+                frontendUrl.replaceAll("/$", "")));
 
         config.setAllowedMethods(List.of(
                 "GET",
