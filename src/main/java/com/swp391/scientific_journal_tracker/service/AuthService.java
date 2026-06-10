@@ -80,7 +80,7 @@ public class AuthService {
 
         if (user.getPasswordHash() == null ||
                 !passwordEncoder.matches(req.getPassword(), user.getPasswordHash()))
-            throw new RuntimeException("Email hoặc mật khẩu không đúng");
+            throw new RuntimeException("Username hoặc mật khẩu không đúng");
 
         String token = jwtService.generateToken(user.getUsername());
         return AuthResponse.builder()
