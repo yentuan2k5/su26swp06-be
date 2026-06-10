@@ -74,7 +74,7 @@ public class EmailService {
     private String frontendUrl;
 
     public void sendResetPasswordEmail(String toEmail, String token) {
-        String resetLink = frontendUrl + "/reset-password?token=" + token;
+        String resetLink = frontendUrl.replaceAll("/$", "") + "/reset-password?token=" + token;
 
         String htmlContent = """
                 <h2>Reset Password</h2>

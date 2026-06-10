@@ -107,7 +107,8 @@ public class AuthService {
 
         String resetLink = frontendUrl + "reset-password?token=" + token;
 
-        emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
+        // emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
+        emailService.sendResetPasswordEmail(user.getEmail(), token);
     }
 
     // ── ĐẶT LẠI MẬT KHẨU ────────────────────────────────────
