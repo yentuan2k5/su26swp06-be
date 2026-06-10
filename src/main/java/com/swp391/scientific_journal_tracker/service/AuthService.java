@@ -105,7 +105,7 @@ public class AuthService {
 
         userRepo.save(user);
 
-        String resetLink = frontendUrl + "reset-password?token=" + token;
+        // String resetLink = frontendUrl + "reset-password?token=" + token;
 
         // emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
         emailService.sendResetPasswordEmail(user.getEmail(), token);
