@@ -150,6 +150,7 @@ public class SyncService {
             // Liên kết paper với journal thông qua JournalId column
             // Note: do mapping dùng insertable=false/updatable=false nên cần set trực tiếp
             // Bạn cần thêm @Column JournalId vào ResearchPaper (xem ghi chú bên dưới)
+            paper.setJournalId(journal.getJournalId());
         }
 
         // Keywords từ fieldsOfStudy
@@ -169,7 +170,7 @@ public class SyncService {
     /**
      * Tìm Journal theo ISSN, nếu chưa có thì tạo mới
      */
-    @SuppressWarnings("unchecked")
+
     private Journal upsertJournal(Map<?, ?> venue) {
         // Lấy ISSN từ venue data
         String issn = null;
