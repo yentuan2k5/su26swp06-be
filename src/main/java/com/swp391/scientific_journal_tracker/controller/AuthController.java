@@ -5,6 +5,7 @@ import com.swp391.scientific_journal_tracker.dto.response.*;
 import com.swp391.scientific_journal_tracker.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,5 +48,10 @@ public class AuthController {
     public ResponseEntity<String> logout(@Valid @RequestBody RefreshTokenRequest req) {
         authService.logout(req.getRefreshToken());
         return ResponseEntity.ok("Đăng xuất thành công");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getMe(Authentication authentication) {
+        return ResponseEntity.ok(authService.getCurrentUser(authentication.getName()));
     }
 }

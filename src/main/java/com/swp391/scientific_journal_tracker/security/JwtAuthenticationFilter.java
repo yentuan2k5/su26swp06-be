@@ -24,6 +24,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getServletPath();
+
+        if (path.equals("/api/auth/register")
+                || path.equals("/api/auth/login")
+                || path.equals("/api/auth/forgot-password")
+                || path.equals("/api/auth/reset-password")
+                || path.equals("/api/auth/refresh-token")
+                || path.equals("/api/auth/logout")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -32,8 +43,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
         if (jwtService.isTokenValid(token)) {
-            String email = jwtService.extractEmail(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            String accessToken = jwtService.extractUsername(token);
+            UserDetails userDetails = userDetailsService.loadUserByUsername(accessToken);
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userDetails, null,
                     userDetails.getAuthorities());
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

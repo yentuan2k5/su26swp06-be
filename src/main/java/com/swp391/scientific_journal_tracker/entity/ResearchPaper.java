@@ -44,6 +44,8 @@ public class ResearchPaper {
     private String sourceApi = "semantic_scholar"; // URL to the paper, if available
     @Column(name = "Authors", columnDefinition = "VARCHAR(1000) COLLATE utf8mb4_unicode_ci")
     private String authors;
+    @Column(name = "JournalId")
+    private Long journalId;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "JournalId", insertable = false, updatable = false)
     private Journal journal;

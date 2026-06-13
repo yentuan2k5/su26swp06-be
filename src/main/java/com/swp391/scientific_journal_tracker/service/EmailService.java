@@ -89,7 +89,6 @@ public class EmailService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.set("api-key", brevoApiKey);
 
         Map<String, Object> sender = Map.of(

@@ -7,14 +7,19 @@ import com.swp391.scientific_journal_tracker.dto.request.ResetPasswordRequest;
 import com.swp391.scientific_journal_tracker.dto.response.AuthResponse;
 import com.swp391.scientific_journal_tracker.dto.response.UserResponse;
 import com.swp391.scientific_journal_tracker.entity.User;
+import com.swp391.scientific_journal_tracker.exception.BadRequestException;
+import com.swp391.scientific_journal_tracker.exception.DuplicateResourceException;
+import com.swp391.scientific_journal_tracker.exception.ResourceNotFoundException;
 import com.swp391.scientific_journal_tracker.repository.RefreshTokenRepository;
 import com.swp391.scientific_journal_tracker.repository.UserRepository;
 import com.swp391.scientific_journal_tracker.security.JwtService;
+
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import java.util.Objects;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -33,31 +38,34 @@ public class AuthService {
 
     @Value("${app.reset-token-expiry-minutes:15}")
     private int resetTokenExpiryMinutes;
+    @Value("${jwt.refresh-expiration-ms:86400000}")
+    private long refreshTokenExpirationMs;
 
     // ── ĐĂNG KÝ ──────────────────────────────────────────────
     public UserResponse register(RegisterRequest req) {
-        // Kiểm tra xem UserName đã tồn tại chưa
+        // check username đã tồn tại chưa
         if (userRepo.existsByUsername(req.getUsername())) {
-            throw new RuntimeException("Username đã được sử dụng");
+            throw new DuplicateResourceException("Username đã được sử dụng");
         }
-        // Kiểm tra xem email đẫ được sử dụng chưa
-        if (userRepo.existsByEmail(req.getEmail()))
-            throw new RuntimeException("Email đã được sử dụng");
-        // Kiểm tra passconfirm có giống password nhập ở trên không
-        if (!req.getPassword().equals(req.getConfirmPassword()))
-            throw new RuntimeException("Mật khẩu xác nhận không khớp");
+        // check email đã được sử dụng chưa
+        if (userRepo.existsByEmail(req.getEmail())) {
+            throw new DuplicateResourceException("Email đã được sử dụng");
+        }
+        // check confirm mật khẩu đã giống chưa
+        if (!req.getPassword().equals(req.getConfirmPassword())) {
+            throw new BadRequestException("Mật khẩu xác nhận không khớp");
+        }
 
-        // Chặn không cho phép tạo tài khoản với vai trò admin
         User.Role role;
 
         try {
             role = User.Role.valueOf(req.getRole().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Vai trò không hợp lệ");
+            throw new BadRequestException("Vai trò không hợp lệ");
         }
 
         if (role == User.Role.ADMIN) {
-            throw new RuntimeException("Không được đăng ký tài khoản ADMIN");
+            throw new BadRequestException("Không được đăng ký tài khoản ADMIN");
         }
 
         User user = User.builder()
@@ -68,23 +76,36 @@ public class AuthService {
                 .role(role)
                 .build();
 
-        User savedUser = userRepo.save(Objects.requireNonNull(user));
+        User savedUser = userRepo.save(java.util.Objects.requireNonNull(user));
         return toUserResponse(savedUser);
+
     }
 
     // ── ĐĂNG NHẬP ────────────────────────────────────────────
+    @Transactional
     public AuthResponse login(LoginRequest req) {
 
         User user = userRepo.findByUsername(req.getUsername())
-                .orElseThrow(() -> new RuntimeException("Username hoặc mật khẩu không đúng"));
+                .orElseThrow(() -> new BadRequestException("Username hoặc mật khẩu không đúng"));
 
         if (user.getPasswordHash() == null ||
-                !passwordEncoder.matches(req.getPassword(), user.getPasswordHash()))
-            throw new RuntimeException("Username hoặc mật khẩu không đúng");
+                !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Username hoặc mật khẩu không đúng");
+        }
 
-        String token = jwtService.generateToken(user.getUsername());
+        String accessToken = jwtService.generateToken(user.getUsername());
+        String refreshToken = jwtService.generateRefreshToken(user.getUsername());
+
+        RefreshToken tokenEntity = new RefreshToken();
+        tokenEntity.setUser(user);
+        tokenEntity.setToken(refreshToken);
+        tokenEntity.setExpiredAt(LocalDateTime.now().plusSeconds(refreshTokenExpirationMs / 1000));
+
+        refreshTokenRepository.save(tokenEntity);
+
         return AuthResponse.builder()
-                .token(token)
+                .token(accessToken)
+                .refreshToken(refreshToken)
                 .user(toUserResponse(user))
                 .build();
     }
@@ -145,12 +166,13 @@ public class AuthService {
 
     // ── REFRESH TOKEN ────────────────────────────────────────
     public AuthResponse refreshToken(String refreshToken) {
+
         RefreshToken saved = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new BadRequestException("Refresh token không hợp lệ"));
 
         if (saved.getExpiredAt().isBefore(LocalDateTime.now())) {
             refreshTokenRepository.delete(saved);
-            throw new RuntimeException("Refresh token đã hết hạn, vui lòng đăng nhập lại");
+            throw new BadRequestException("Refresh token đã hết hạn, vui lòng đăng nhập lại");
         }
 
         User user = saved.getUser();
@@ -158,6 +180,7 @@ public class AuthService {
 
         return AuthResponse.builder()
                 .token(newAccessToken)
+                .refreshToken(refreshToken)
                 .user(toUserResponse(user))
                 .build();
     }
@@ -166,5 +189,13 @@ public class AuthService {
     public void logout(String refreshToken) {
         refreshTokenRepository.findByToken(refreshToken)
                 .ifPresent(refreshTokenRepository::delete);
+    }
+
+    public UserResponse getCurrentUser(String username) {
+
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản"));
+
+        return toUserResponse(user);
     }
 }

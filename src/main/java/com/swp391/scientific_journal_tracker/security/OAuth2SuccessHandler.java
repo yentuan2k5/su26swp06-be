@@ -45,7 +45,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         if (user.getGoogleId() == null) {
             user.setGoogleId(googleId);
-            user.setProvider("google");
+
+            // Nếu user có password rồi thì đây là tài khoản local,
+            // chỉ liên kết thêm Google, không đổi provider thành google.
+            if (user.getPasswordHash() == null) {
+                user.setProvider("google");
+            }
+
             userRepository.save(user);
         }
         String token = jwtService.generateToken(user.getUsername());
