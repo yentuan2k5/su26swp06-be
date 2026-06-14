@@ -1,4 +1,5 @@
 package com.swp391.scientific_journal_tracker.service;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,15 +19,26 @@ public class PaperService {
 
     public Page<PaperResponse> getPapers(
             String search,
-            Integer year,
+            String author,
             String keyword,
+            String journal,
+            String topic,
+            Integer yearFrom,
+            Integer yearTo,
             int page,
-            int size
-    ) {
+            int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("year").descending());
 
         return researchPaperRepository
-                .searchPapers(emptyToNull(search), year, emptyToNull(keyword), pageable)
+                .searchPapers(
+                        emptyToNull(search),
+                        emptyToNull(author),
+                        emptyToNull(keyword),
+                        emptyToNull(journal),
+                        emptyToNull(topic),
+                        yearFrom,
+                        yearTo,
+                        pageable)
                 .map(PaperResponse::fromEntity);
     }
 

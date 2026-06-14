@@ -41,17 +41,28 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
         SELECT DISTINCT p
         FROM ResearchPaper p
         LEFT JOIN p.keywords k
-        WHERE (:search IS NULL
-            OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :search, '%')))
-        AND (:year IS NULL OR p.year = :year)
-        AND (:keyword IS NULL OR LOWER(k.term) = LOWER(:keyword))
+        LEFT JOIN p.researchTopics t
+        LEFT JOIN p.journal j
+        WHERE
+            (:search IS NULL
+                OR LOWER(p.title)        LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(p.authors)      LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:author   IS NULL OR LOWER(p.authors)   LIKE LOWER(CONCAT('%', :author,   '%')))
+            AND (:keyword  IS NULL OR LOWER(k.term)      =    LOWER(:keyword))
+            AND (:journal  IS NULL OR LOWER(j.title)     LIKE LOWER(CONCAT('%', :journal,  '%')))
+            AND (:topic    IS NULL OR LOWER(t.name)      LIKE LOWER(CONCAT('%', :topic,    '%')))
+            AND (:yearFrom IS NULL OR p.year >= :yearFrom)
+            AND (:yearTo   IS NULL OR p.year <= :yearTo)
     """)
     Page<ResearchPaper> searchPapers(
-            @Param("search") String search,
-            @Param("year") Integer year,
-            @Param("keyword") String keyword,
+            @Param("search")   String  search,
+            @Param("author")   String  author,
+            @Param("keyword")  String  keyword,
+            @Param("journal")  String  journal,
+            @Param("topic")    String  topic,
+            @Param("yearFrom") Integer yearFrom,
+            @Param("yearTo")   Integer yearTo,
             Pageable pageable
     );
 }
