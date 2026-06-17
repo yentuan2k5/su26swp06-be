@@ -20,7 +20,7 @@ public class SyncScheduler {
     @Scheduled(cron = "0 0 2 * * *")
     public void scheduledSync() {
         log.info("Scheduler kích hoạt sync tự động...");
-        syncService.syncFromSemanticScholar();
+        syncService.syncFromOpenAlex();
     }
 
     /**

@@ -41,7 +41,7 @@ public class ResearchPaper {
     @Column(name = "CitationCount", nullable = false, columnDefinition = "INT DEFAULT 0")
     private Integer citationCount = 0;// Default to 0 if not provided
     @Column(name = "SourceApi", nullable = false, columnDefinition = "VARCHAR(50) COLLATE utf8mb4_unicode_ci")
-    private String sourceApi = "semantic_scholar"; // URL to the paper, if available
+    private String sourceApi = "openalex"; // External metadata source
     @Column(name = "Authors", columnDefinition = "VARCHAR(1000) COLLATE utf8mb4_unicode_ci")
     private String authors;
     @Column(name = "JournalId")

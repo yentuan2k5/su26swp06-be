@@ -26,7 +26,7 @@ public class AdminController {
      */
     @PostMapping("/sync")
     public ResponseEntity<SyncLogResponse> triggerSync() {
-        SyncLogResponse result = syncService.syncFromSemanticScholar();
+        SyncLogResponse result = syncService.syncFromOpenAlex();
         return ResponseEntity.ok(result);
     }
 
