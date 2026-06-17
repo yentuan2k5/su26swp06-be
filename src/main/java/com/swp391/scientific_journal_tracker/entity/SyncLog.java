@@ -26,7 +26,7 @@ public class SyncLog {
     @Column(name = "SourceApi", columnDefinition = "Varchar(50) COLLATE utf8mb4_unicode_ci")
     private String sourceApi;
     @Enumerated(EnumType.STRING)
-    @Column(name = "Status", nullable = false, updatable = false, insertable = true)
+    @Column(name = "Status", nullable = false)
     private Status status = Status.RUNNING;
 
     public enum Status {
