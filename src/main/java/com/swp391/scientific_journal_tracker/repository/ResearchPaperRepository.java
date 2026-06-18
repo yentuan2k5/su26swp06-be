@@ -72,6 +72,7 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                     AND (:yearFrom IS NULL OR p.year >= :yearFrom)
                     AND (:yearTo   IS NULL OR p.year <= :yearTo)
             """)
+    
     Page<ResearchPaper> searchPapers(
             @Param("search") String search,
             @Param("author") String author,
@@ -80,5 +81,25 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             @Param("topic") String topic,
             @Param("yearFrom") Integer yearFrom,
             @Param("yearTo") Integer yearTo,
-            Pageable pageable);
+            Pageable pageable
+        );
+        @Query("""
+            SELECT p.year, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            JOIN p.keywords k
+            WHERE LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            GROUP BY p.year
+            ORDER BY p.year
+        """)
+        List<Object[]> getTrendByKeyword(@Param("keyword") String keyword);
+
+        @Query("""
+            SELECT p.year, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            JOIN p.researchTopics t
+            WHERE LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+            GROUP BY p.year
+            ORDER BY p.year
+        """)
+        List<Object[]> getTrendByTopic(@Param("topic") String topic);
 }
