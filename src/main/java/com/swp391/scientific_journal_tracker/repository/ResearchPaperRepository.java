@@ -37,6 +37,35 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
 
     List<ResearchPaper> findTop10ByOrderByYearDesc();
 
+    long countBySourceApi(String sourceApi);
+
+    @Query("""
+        SELECT p.year, COUNT(p)
+        FROM ResearchPaper p
+        WHERE p.year IS NOT NULL
+        GROUP BY p.year
+        ORDER BY p.year DESC
+    """)
+    List<Object[]> countPapersByYear();
+
+    @Query("""
+        SELECT k.term, COUNT(p)
+        FROM ResearchPaper p
+        JOIN p.keywords k
+        GROUP BY k.term
+        ORDER BY COUNT(p) DESC
+    """)
+    List<Object[]> countTopKeywords(Pageable pageable);
+
+    @Query("""
+        SELECT j.title, COUNT(p)
+        FROM ResearchPaper p
+        JOIN p.journal j
+        GROUP BY j.title
+        ORDER BY COUNT(p) DESC
+    """)
+    List<Object[]> countTopJournals(Pageable pageable);
+
     @Query("""
         SELECT DISTINCT p
         FROM ResearchPaper p
