@@ -60,8 +60,13 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                                                 .anyRequest().authenticated())
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                                .logout(logout -> logout
+                                                .logoutUrl("/api/auth/logout")
+                                                .invalidateHttpSession(true)
+                                                .clearAuthentication(true)
+                                                .deleteCookies("JSESSIONID")
+                                                .logoutSuccessHandler((req, res, auth) -> res.setStatus(200)));
                 return http.build();
         }
 
@@ -77,9 +82,9 @@ public class SecurityConfig {
                                                                 "/login/oauth2/**",
                                                                 "/oauth2/**",
                                                                 "/error",
-                                                        "/api/papers/**",
-                                                        "/api/keywords/**",
-                                                        "/api/dashboard/**")
+                                                                "/api/papers/**",
+                                                                "/api/keywords/**",
+                                                                "/api/dashboard/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(ex -> ex
@@ -88,7 +93,15 @@ public class SecurityConfig {
                                                                                 "Unauthorized")))
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                                 .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2SuccessHandler))
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                                .logout(logout -> logout
+                                                .logoutUrl("/logout")
+                                                .invalidateHttpSession(true)
+                                                .clearAuthentication(true)
+                                                .deleteCookies("JSESSIONID")
+                                                .logoutSuccessHandler((req, res, auth) -> {
+                                                        res.setStatus(HttpServletResponse.SC_OK);
+                                                }));
 
                 return http.build();
         }
