@@ -85,7 +85,7 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest req) {
 
-        User user = userRepo.findByUsername(req.getUsername())
+        User user = userRepo.findByEmailOrUsername(req.getUsername(), req.getUsername())
                 .orElseThrow(() -> new BadRequestException("Username hoặc mật khẩu không đúng"));
 
         if (user.getPasswordHash() == null ||
