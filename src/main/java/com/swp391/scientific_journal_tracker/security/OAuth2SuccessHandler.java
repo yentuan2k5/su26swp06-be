@@ -56,7 +56,29 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         }
         String token = jwtService.generateToken(user.getUsername());
 
+        String redirectBase = resolveRedirectOrigin(request);
+
         getRedirectStrategy().sendRedirect(request, response,
-                frontendUrl + "oauth2/callback?token=" + token);
+                redirectBase + "oauth2/callback?token=" + token);
+    }
+
+    /**
+     * Ưu tiên domain mà FE đã gửi kèm lúc bắt đầu luồng Google login
+     * (lưu trong cookie bởi OAuth2RedirectOriginFilter). Nếu không có
+     * (hoặc cookie không hợp lệ), fallback về domain mặc định trong
+     * app.frontend-url.
+     */
+    private String resolveRedirectOrigin(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (OAuth2RedirectOriginFilter.COOKIE_NAME.equals(cookie.getName())
+                        && cookie.getValue() != null
+                        && !cookie.getValue().isBlank()) {
+                    return cookie.getValue().replaceAll("/$", "") + "/";
+                }
+            }
+        }
+
+        return frontendUrl;
     }
 }

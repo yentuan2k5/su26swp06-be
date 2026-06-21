@@ -2,6 +2,7 @@ package com.swp391.scientific_journal_tracker.config;
 
 import java.util.List;
 
+import com.swp391.scientific_journal_tracker.security.OAuth2RedirectOriginFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +37,7 @@ public class SecurityConfig {
 
         private final JwtAuthenticationFilter jwtAuthFilter;
         private final OAuth2SuccessHandler oAuth2SuccessHandler;
+        private final OAuth2RedirectOriginFilter oAuth2RedirectOriginFilter;
 
         @Value("${app.frontend-url:http://localhost:5173/}")
         private String frontendUrl;
@@ -93,6 +95,7 @@ public class SecurityConfig {
                                                                                 "Unauthorized")))
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                                 .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2SuccessHandler))
+                                .addFilterBefore(oAuth2RedirectOriginFilter, UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                                 .logout(logout -> logout
                                                 .logoutUrl("/logout")
