@@ -1,5 +1,13 @@
 package com.swp391.scientific_journal_tracker.dto.response;
 
-public class TrendResponse {
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TrendResponse {
+    private Integer year;
+    private Long paperCount;
 }

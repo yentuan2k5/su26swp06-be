@@ -84,9 +84,15 @@ public class SecurityConfig {
                                                                 "/login/oauth2/**",
                                                                 "/oauth2/**",
                                                                 "/error",
+
                                                                 "/api/papers/**",
                                                                 "/api/keywords/**",
-                                                                "/api/dashboard/**")
+                                                                "/api/dashboard/**",
+
+                                                                "/api/papers/**",
+                                                                "/api/keywords/**",
+                                                                "/api/trends/**")
+
                                                 .permitAll()
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(ex -> ex

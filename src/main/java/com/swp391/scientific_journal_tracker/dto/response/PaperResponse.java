@@ -1,8 +1,10 @@
 package com.swp391.scientific_journal_tracker.dto.response;
+
 import java.util.List;
 
 import com.swp391.scientific_journal_tracker.entity.Keyword;
 import com.swp391.scientific_journal_tracker.entity.ResearchPaper;
+import com.swp391.scientific_journal_tracker.entity.ResearchTopic;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,6 +24,8 @@ public class PaperResponse {
     private String sourceApi;
     private String authors;
     private List<String> keywords;
+    private String journalTitle;
+    private List<String> topics;
 
     public static PaperResponse fromEntity(ResearchPaper paper) {
         return new PaperResponse(
@@ -37,7 +41,12 @@ public class PaperResponse {
                 paper.getKeywords()
                         .stream()
                         .map(Keyword::getTerm)
+                        .toList(),
+                paper.getJournal() != null ? paper.getJournal().getTitle() : null,
+                paper.getResearchTopics()
+                        .stream()
+                        .map(ResearchTopic::getName)
                         .toList()
         );
     }
-}   
+}
