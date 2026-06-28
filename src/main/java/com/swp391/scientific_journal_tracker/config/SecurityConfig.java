@@ -77,7 +77,8 @@ public class SecurityConfig {
                                                                 "/error",
                                                         "/api/papers/**",
                                                         "/api/keywords/**",
-                                                        "/api/trends/**")
+                                                        "/api/trends/**",
+                                                        "/api/bookmarks/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(ex -> ex

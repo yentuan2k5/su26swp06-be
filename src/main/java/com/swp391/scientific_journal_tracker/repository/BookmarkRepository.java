@@ -14,8 +14,11 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
         boolean existsByUserUserIdAndResearchPaperResearchPaperId(
                         Long userId,
                         Long researchPaperId);
-
+        
         Optional<Bookmark> findByUserUserIdAndResearchPaperResearchPaperId(
+                        Long userId,
+                        Long researchPaperId);
+        void deleteByUserUserIdAndResearchPaperResearchPaperId(
                         Long userId,
                         Long researchPaperId);
 }
