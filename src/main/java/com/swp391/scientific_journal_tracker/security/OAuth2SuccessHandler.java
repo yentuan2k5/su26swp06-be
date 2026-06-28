@@ -11,15 +11,26 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 
+import com.swp391.scientific_journal_tracker.entity.RefreshToken;
+import com.swp391.scientific_journal_tracker.repository.RefreshTokenRepository;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+
 @Component
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
+
+    @Value("${jwt.refresh-expiration-ms:86400000}")
+    private long refreshTokenExpirationMs;
 
     @SuppressWarnings("null")
     @Override
@@ -48,9 +59,49 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             user.setProvider("google");
             userRepository.save(user);
         }
-        String token = jwtService.generateToken(user.getUsername());
+        String accessToken = jwtService.generateToken(user.getUsername());
+        String refreshToken = jwtService.generateRefreshToken(user.getUsername());
 
+        RefreshToken refreshTokenEntity = new RefreshToken();
+        refreshTokenEntity.setUser(user);
+        refreshTokenEntity.setToken(refreshToken);
+        refreshTokenEntity.setExpiredAt(
+                LocalDateTime.now().plusSeconds(refreshTokenExpirationMs / 1000));
+
+        refreshTokenRepository.save(refreshTokenEntity);
+
+<<<<<<< Updated upstream
         getRedirectStrategy().sendRedirect(request, response,
                 frontendUrl + "oauth2/callback?token=" + token);
+=======
+        String redirectBase = resolveRedirectOrigin(request);
+
+        String redirectUrl = redirectBase + "oauth2/callback"
+                + "?token=" + URLEncoder.encode(accessToken, StandardCharsets.UTF_8)
+                + "&refreshToken=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8);
+
+        getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
+
+    /**
+     * Ưu tiên domain mà FE đã gửi kèm lúc bắt đầu luồng Google login
+     * (lưu trong cookie bởi OAuth2RedirectOriginFilter). Nếu không có
+     * (hoặc cookie không hợp lệ), fallback về domain mặc định trong
+     * app.frontend-url.
+     */
+    private String resolveRedirectOrigin(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (OAuth2RedirectOriginFilter.COOKIE_NAME.equals(cookie.getName())
+                        && cookie.getValue() != null
+                        && !cookie.getValue().isBlank()) {
+                    return cookie.getValue().replaceAll("/$", "") + "/";
+                }
+            }
+        }
+
+        return frontendUrl.replaceAll("/$", "") + "/";
+>>>>>>> Stashed changes
+    }
+
 }
