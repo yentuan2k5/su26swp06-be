@@ -83,17 +83,18 @@ public class SecurityConfig {
                                                 .requestMatchers(
                                                                 "/login/oauth2/**",
                                                                 "/oauth2/**",
-                                                                "/error",
+                                                                "/error")
+                                                .permitAll()
 
+                                                .requestMatchers(
                                                                 "/api/papers/**",
                                                                 "/api/keywords/**",
                                                                 "/api/dashboard/**",
-
-                                                                "/api/papers/**",
-                                                                "/api/keywords/**",
                                                                 "/api/trends/**")
-
                                                 .permitAll()
+
+                                                .requestMatchers("/api/bookmarks/**").authenticated()
+
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(ex -> ex
                                                 .authenticationEntryPoint((request, response, authException) -> response
