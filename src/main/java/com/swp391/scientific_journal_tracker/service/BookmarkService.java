@@ -2,8 +2,11 @@ package com.swp391.scientific_journal_tracker.service;
 
 import java.util.List;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.swp391.scientific_journal_tracker.dto.response.BookmarkResponse;
 import com.swp391.scientific_journal_tracker.entity.Bookmark;
 import com.swp391.scientific_journal_tracker.entity.ResearchPaper;
 import com.swp391.scientific_journal_tracker.entity.User;
@@ -23,50 +26,69 @@ public class BookmarkService {
         private final UserRepository userRepository;
         private final ResearchPaperRepository researchPaperRepository;
 
+        @Transactional
+        public BookmarkResponse saveBookmark(Long paperId, Authentication authentication) {
+                User user = getCurrentUser(authentication);
 
-        public Bookmark saveBookmark(Long userId, Long paperId) {
-
-                if (bookmarkRepository
-                        .existsByUserUserIdAndResearchPaperResearchPaperId(
-                                userId,
+                if (bookmarkRepository.existsByUserUserIdAndResearchPaperResearchPaperId(
+                                user.getUserId(),
                                 paperId)) {
-
-                throw new DuplicateResourceException(
-                        "Paper already bookmarked");
+                        throw new DuplicateResourceException("Paper already bookmarked");
                 }
 
-                User user = userRepository.findById(userId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "User not found"));
-
                 ResearchPaper paper = researchPaperRepository.findById(paperId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Paper not found"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Paper not found"));
 
                 Bookmark bookmark = new Bookmark();
                 bookmark.setUser(user);
                 bookmark.setResearchPaper(paper);
 
-                return bookmarkRepository.save(bookmark);
+                Bookmark savedBookmark = bookmarkRepository.save(bookmark);
+
+                return BookmarkResponse.fromEntity(savedBookmark);
         }
 
-        public void removeBookmark(Long userId, Long paperId) {
+        @Transactional
+        public void removeBookmark(Long paperId, Authentication authentication) {
+                User user = getCurrentUser(authentication);
 
                 Bookmark bookmark = bookmarkRepository
-                        .findByUserUserIdAndResearchPaperResearchPaperId(
-                                userId,
-                                paperId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Bookmark not found"));
+                                .findByUserUserIdAndResearchPaperResearchPaperId(
+                                                user.getUserId(),
+                                                paperId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Bookmark not found"));
 
                 bookmarkRepository.delete(bookmark);
         }
 
-        public List<Bookmark> getBookmarksByUser(Long userId) {
+        @Transactional(readOnly = true)
+        public List<BookmarkResponse> getMyBookmarks(Authentication authentication) {
+                User user = getCurrentUser(authentication);
 
-                return bookmarkRepository.findByUserUserId(userId);
+                return bookmarkRepository
+                                .findByUserUserIdOrderBySavedAtDesc(user.getUserId())
+                                .stream()
+                                .map(BookmarkResponse::fromEntity)
+                                .toList();
+        }
+
+        @Transactional(readOnly = true)
+        public boolean isBookmarked(Long paperId, Authentication authentication) {
+                User user = getCurrentUser(authentication);
+
+                return bookmarkRepository.existsByUserUserIdAndResearchPaperResearchPaperId(
+                                user.getUserId(),
+                                paperId);
+        }
+
+        private User getCurrentUser(Authentication authentication) {
+                if (authentication == null || authentication.getName() == null) {
+                        throw new ResourceNotFoundException("User not authenticated");
+                }
+
+                String username = authentication.getName();
+
+                return userRepository.findByUsername(username)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         }
 }

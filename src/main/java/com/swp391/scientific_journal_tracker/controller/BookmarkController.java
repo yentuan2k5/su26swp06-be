@@ -1,17 +1,17 @@
 package com.swp391.scientific_journal_tracker.controller;
 
-
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.swp391.scientific_journal_tracker.entity.Bookmark;
+import com.swp391.scientific_journal_tracker.dto.response.BookmarkResponse;
 import com.swp391.scientific_journal_tracker.service.BookmarkService;
 
 import lombok.RequiredArgsConstructor;
@@ -20,35 +20,36 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/bookmarks")
 @RequiredArgsConstructor
 public class BookmarkController {
+
         private final BookmarkService bookmarkService;
 
-        @PostMapping
-        public Bookmark saveBookmark(
-                @RequestParam Long userId,
-                @RequestParam Long paperId) {
-
-                return bookmarkService.saveBookmark(
-                        userId,
-                        paperId);
+        @PostMapping("/{paperId}")
+        public BookmarkResponse saveBookmark(
+                        @PathVariable Long paperId,
+                        Authentication authentication) {
+                return bookmarkService.saveBookmark(paperId, authentication);
         }
 
-        @DeleteMapping
-        public String removeBookmark(
-                @RequestParam Long userId,
-                @RequestParam Long paperId) {
+        @DeleteMapping("/{paperId}")
+        public Map<String, String> removeBookmark(
+                        @PathVariable Long paperId,
+                        Authentication authentication) {
+                bookmarkService.removeBookmark(paperId, authentication);
 
-                bookmarkService.removeBookmark(
-                        userId,
-                        paperId);
-
-                return "Bookmark removed successfully";
+                return Map.of("message", "Bookmark removed successfully");
         }
 
-        @GetMapping("/{userId}")
-        public List<Bookmark> getBookmarks(
-                @PathVariable Long userId) {
+        @GetMapping
+        public List<BookmarkResponse> getMyBookmarks(Authentication authentication) {
+                return bookmarkService.getMyBookmarks(authentication);
+        }
 
-                return bookmarkService.getBookmarksByUser(
-                        userId);
+        @GetMapping("/check/{paperId}")
+        public Map<String, Boolean> checkBookmarked(
+                        @PathVariable Long paperId,
+                        Authentication authentication) {
+                boolean bookmarked = bookmarkService.isBookmarked(paperId, authentication);
+
+                return Map.of("bookmarked", bookmarked);
         }
 }
