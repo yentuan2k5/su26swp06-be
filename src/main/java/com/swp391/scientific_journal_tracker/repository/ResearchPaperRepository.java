@@ -31,6 +31,8 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
 
     List<ResearchPaper> findByJournalJournalId(Long journalId);
 
+    Page<ResearchPaper> findByJournalJournalId(Long journalId, Pageable pageable);
+
     List<ResearchPaper> findByApiDataSourceApiDataSourceId(Long apiDataSourceId);
 
     List<ResearchPaper> findTop10ByOrderByCitationCountDesc();

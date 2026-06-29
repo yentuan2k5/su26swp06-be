@@ -94,6 +94,7 @@ public class SecurityConfig {
                                                 .permitAll()
 
                                                 .requestMatchers(HttpMethod.GET, "/api/topics/**").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/journals/**").permitAll()
                                                 .requestMatchers("/api/bookmarks/**").authenticated()
 
                                                 .anyRequest().authenticated())
