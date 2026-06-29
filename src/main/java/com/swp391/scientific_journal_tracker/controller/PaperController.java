@@ -16,21 +16,26 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/papers")
 @RequiredArgsConstructor
 public class PaperController {
+
     private final PaperService paperService;
 
     /**
      * GET /api/papers
      *
-     * Query params (tất cả đều optional):
-     *   search   - tìm trong title / abstract / authors
-     *   author   - lọc theo tên tác giả (contains)
-     *   keyword  - lọc theo keyword chính xác
-     *   journal  - lọc theo tên journal (contains)
-     *   topic    - lọc theo tên topic (contains)
-     *   yearFrom - năm bắt đầu (>= yearFrom)
-     *   yearTo   - năm kết thúc (<= yearTo)
-     *   page     - trang (mặc định 0)
-     *   size     - số kết quả mỗi trang (mặc định 10)
+     * Query params:
+     * search - tìm chung trong title / abstract / authors / keyword / journal /
+     * topic
+     * author - lọc theo tác giả
+     * keyword - lọc theo keyword
+     * journal - lọc theo journal
+     * topic - lọc theo topic
+     * year - lọc đúng một năm
+     * yearFrom - lọc từ năm
+     * yearTo - lọc đến năm
+     * page - số trang, mặc định 0
+     * size - số kết quả, mặc định 10, tối đa 50
+     * sortBy - year / citationCount / title / researchPaperId
+     * sortDir - asc / desc
      */
     @GetMapping
     public Page<PaperResponse> getPapers(
@@ -39,12 +44,26 @@ public class PaperController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String journal,
             @RequestParam(required = false) String topic,
+            @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer yearFrom,
             @RequestParam(required = false) Integer yearTo,
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        return paperService.getPapers(search, author, keyword, journal, topic, yearFrom, yearTo, page, size);
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "year") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        return paperService.getPapers(
+                search,
+                author,
+                keyword,
+                journal,
+                topic,
+                year,
+                yearFrom,
+                yearTo,
+                page,
+                size,
+                sortBy,
+                sortDir);
     }
 
     @GetMapping("/{id}")

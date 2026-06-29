@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaperResponse {
+
     private Long researchPaperId;
     private String externalId;
     private String title;
@@ -28,6 +29,20 @@ public class PaperResponse {
     private List<String> topics;
 
     public static PaperResponse fromEntity(ResearchPaper paper) {
+        List<String> keywords = paper.getKeywords() == null
+                ? List.of()
+                : paper.getKeywords()
+                        .stream()
+                        .map(Keyword::getTerm)
+                        .toList();
+
+        List<String> topics = paper.getResearchTopics() == null
+                ? List.of()
+                : paper.getResearchTopics()
+                        .stream()
+                        .map(ResearchTopic::getName)
+                        .toList();
+
         return new PaperResponse(
                 paper.getResearchPaperId(),
                 paper.getExternalId(),
@@ -38,15 +53,8 @@ public class PaperResponse {
                 paper.getCitationCount(),
                 paper.getSourceApi(),
                 paper.getAuthors(),
-                paper.getKeywords()
-                        .stream()
-                        .map(Keyword::getTerm)
-                        .toList(),
+                keywords,
                 paper.getJournal() != null ? paper.getJournal().getTitle() : null,
-                paper.getResearchTopics()
-                        .stream()
-                        .map(ResearchTopic::getName)
-                        .toList()
-        );
+                topics);
     }
 }

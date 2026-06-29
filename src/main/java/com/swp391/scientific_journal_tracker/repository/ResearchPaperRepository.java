@@ -92,16 +92,37 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                 LEFT JOIN p.researchTopics t
                 LEFT JOIN p.journal j
                 WHERE
-                    (:search IS NULL
-                        OR LOWER(p.title)        LIKE LOWER(CONCAT('%', :search, '%'))
+                    (
+                        :search IS NULL
+                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
                         OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(p.authors)      LIKE LOWER(CONCAT('%', :search, '%')))
-                    AND (:author   IS NULL OR LOWER(p.authors)   LIKE LOWER(CONCAT('%', :author,   '%')))
-                    AND (:keyword  IS NULL OR LOWER(k.term)      LIKE LOWER(CONCAT('%', :keyword, '%')))
-                    AND (:journal  IS NULL OR LOWER(j.title)     LIKE LOWER(CONCAT('%', :journal,  '%')))
-                    AND (:topic    IS NULL OR LOWER(t.name)      LIKE LOWER(CONCAT('%', :topic,    '%')))
+                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :search, '%'))
+                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :search, '%'))
+                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                    )
+                    AND (
+                        :author IS NULL
+                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :author, '%'))
+                    )
+                    AND (
+                        :keyword IS NULL
+                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    )
+                    AND (
+                        :journal IS NULL
+                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :journal, '%'))
+                    )
+                    AND (
+                        :topic IS NULL
+                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :topic, '%'))
+                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :topic, '%'))
+                        OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    )
+                    AND (:year IS NULL OR p.year = :year)
                     AND (:yearFrom IS NULL OR p.year >= :yearFrom)
-                    AND (:yearTo   IS NULL OR p.year <= :yearTo)
+                    AND (:yearTo IS NULL OR p.year <= :yearTo)
             """, countQuery = """
                 SELECT COUNT(DISTINCT p)
                 FROM ResearchPaper p
@@ -109,23 +130,45 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                 LEFT JOIN p.researchTopics t
                 LEFT JOIN p.journal j
                 WHERE
-                    (:search IS NULL
-                        OR LOWER(p.title)        LIKE LOWER(CONCAT('%', :search, '%'))
+                    (
+                        :search IS NULL
+                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
                         OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(p.authors)      LIKE LOWER(CONCAT('%', :search, '%')))
-                    AND (:author   IS NULL OR LOWER(p.authors)   LIKE LOWER(CONCAT('%', :author,   '%')))
-                    AND (:keyword  IS NULL OR LOWER(k.term)      LIKE LOWER(CONCAT('%', :keyword, '%')))
-                    AND (:journal  IS NULL OR LOWER(j.title)     LIKE LOWER(CONCAT('%', :journal,  '%')))
-                    AND (:topic    IS NULL OR LOWER(t.name)      LIKE LOWER(CONCAT('%', :topic,    '%')))
+                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :search, '%'))
+                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :search, '%'))
+                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                    )
+                    AND (
+                        :author IS NULL
+                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :author, '%'))
+                    )
+                    AND (
+                        :keyword IS NULL
+                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    )
+                    AND (
+                        :journal IS NULL
+                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :journal, '%'))
+                    )
+                    AND (
+                        :topic IS NULL
+                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :topic, '%'))
+                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :topic, '%'))
+                        OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    )
+                    AND (:year IS NULL OR p.year = :year)
                     AND (:yearFrom IS NULL OR p.year >= :yearFrom)
-                    AND (:yearTo   IS NULL OR p.year <= :yearTo)
+                    AND (:yearTo IS NULL OR p.year <= :yearTo)
             """)
-    Page<ResearchPaper> searchPapers(
+    Page<ResearchPaper> searchPapersAdvanced(
             @Param("search") String search,
             @Param("author") String author,
             @Param("keyword") String keyword,
             @Param("journal") String journal,
             @Param("topic") String topic,
+            @Param("year") Integer year,
             @Param("yearFrom") Integer yearFrom,
             @Param("yearTo") Integer yearTo,
             Pageable pageable);
@@ -149,5 +192,4 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                 ORDER BY p.year
             """)
     List<Object[]> getTrendByTopic(@Param("topic") String topic);
-
 }

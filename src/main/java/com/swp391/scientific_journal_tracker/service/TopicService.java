@@ -52,7 +52,7 @@ public class TopicService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PaperResponse> getPapersByTopic(Long topicId, int page, int size) {
+    public Page<PaperResponse> getPapersByTopicPage(Long topicId, int page, int size) {
         ResearchTopic topic = getTopicById(topicId);
 
         Pageable pageable = PageRequest.of(
@@ -61,14 +61,15 @@ public class TopicService {
                 Sort.by("year").descending());
 
         return researchPaperRepository
-                .searchPapers(
-                        null,
-                        null,
-                        null,
-                        null,
-                        topic.getName(),
-                        null,
-                        null,
+                .searchPapersAdvanced(
+                        null, // search
+                        null, // author
+                        null, // keyword
+                        null, // journal
+                        topic.getName(), // topic
+                        null, // year
+                        null, // yearFrom
+                        null, // yearTo
                         pageable)
                 .map(PaperResponse::fromEntity);
     }
@@ -87,6 +88,28 @@ public class TopicService {
                         ((Number) row[3]).longValue(),
                         ((Number) row[4]).longValue()))
                 .toList();
+    }
+
+    public Page<PaperResponse> getPapersByTopic(Long topicId, int page, int size) {
+        ResearchTopic topic = getTopicById(topicId);
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("year").descending());
+
+        return researchPaperRepository
+                .searchPapersAdvanced(
+                        null,
+                        null,
+                        null,
+                        null,
+                        topic.getName(),
+                        null,
+                        null,
+                        null,
+                        pageable)
+                .map(PaperResponse::fromEntity);
     }
 
     private ResearchTopic getTopicById(Long topicId) {
