@@ -93,6 +93,7 @@ public class SecurityConfig {
                                                                 "/api/trends/**")
                                                 .permitAll()
 
+                                                .requestMatchers(HttpMethod.GET, "/api/topics/**").permitAll()
                                                 .requestMatchers("/api/bookmarks/**").authenticated()
 
                                                 .anyRequest().authenticated())
