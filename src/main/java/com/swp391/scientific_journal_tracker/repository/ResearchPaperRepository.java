@@ -150,4 +150,20 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             """)
     List<Object[]> getTrendByTopic(@Param("topic") String topic);
 
+    @Query("""
+                SELECT t.name, COUNT(DISTINCT p)
+                FROM ResearchPaper p
+                JOIN p.researchTopics t
+                WHERE p.year >= :fromYear
+                GROUP BY t.researchTopicId, t.name
+                ORDER BY COUNT(DISTINCT p) DESC
+            """)
+    List<Object[]> getTop5TrendingTopics(
+        @Param("fromYear") Integer fromYear,
+        Pageable pageable
+    );
+    
+
+    
+
 }
