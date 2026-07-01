@@ -24,7 +24,7 @@ public interface ResearchTopicRepository extends JpaRepository<ResearchTopic, Lo
             SELECT DISTINCT t
             FROM ResearchTopic t
             WHERE LOWER(t.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(COALESCE(t.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(COALESCE(t.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
             ORDER BY t.name ASC
             """)
     List<ResearchTopic> searchTopics(@Param("keyword") String keyword);
