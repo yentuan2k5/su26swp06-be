@@ -7,8 +7,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -29,8 +27,7 @@ public class ResearchTopic {
     private String name;
     @Column(name = "Description", columnDefinition = "TEXT COLLATE utf8mb4_unicode_ci")
     private String description;
-    @ManyToMany
-    @JoinTable(name = "paper_topics", joinColumns = @JoinColumn(name = "ResearchTopicId"), inverseJoinColumns = @JoinColumn(name = "ResearchPaperId"))
+    @ManyToMany(mappedBy = "researchTopics")
     private List<ResearchPaper> researchPapers = new ArrayList<>();
     @ManyToMany(mappedBy = "followingTopics")
     private List<User> followers = new ArrayList<>();

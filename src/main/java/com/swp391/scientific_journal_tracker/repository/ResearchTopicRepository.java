@@ -14,6 +14,8 @@ public interface ResearchTopicRepository extends JpaRepository<ResearchTopic, Lo
 
     Optional<ResearchTopic> findByName(String name);
 
+    Optional<ResearchTopic> findByNameIgnoreCase(String name);
+
     boolean existsByName(String name);
 
     List<ResearchTopic> findByNameContainingIgnoreCase(String name);

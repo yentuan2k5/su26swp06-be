@@ -177,9 +177,10 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                 SELECT p.year, COUNT(DISTINCT p)
                 FROM ResearchPaper p
                 JOIN p.keywords k
-                WHERE LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                WHERE p.year IS NOT NULL
+                AND LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
                 GROUP BY p.year
-                ORDER BY p.year
+                ORDER BY p.year ASC
             """)
     List<Object[]> getTrendByKeyword(@Param("keyword") String keyword);
 
@@ -187,9 +188,10 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                 SELECT p.year, COUNT(DISTINCT p)
                 FROM ResearchPaper p
                 JOIN p.researchTopics t
-                WHERE LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                WHERE p.year IS NOT NULL
+                AND LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
                 GROUP BY p.year
-                ORDER BY p.year
+                ORDER BY p.year ASC
             """)
     List<Object[]> getTrendByTopic(@Param("topic") String topic);
 
@@ -197,7 +199,8 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
                 SELECT t.name, COUNT(DISTINCT p)
                 FROM ResearchPaper p
                 JOIN p.researchTopics t
-                WHERE p.year >= :fromYear
+                WHERE p.year IS NOT NULL
+                AND p.year >= :fromYear
                 GROUP BY t.researchTopicId, t.name
                 ORDER BY COUNT(DISTINCT p) DESC
             """)

@@ -52,4 +52,34 @@ public class BookmarkController {
 
                 return Map.of("bookmarked", bookmarked);
         }
+
+        @PostMapping("/keywords/{keywordId}")
+        public BookmarkResponse saveKeywordBookmark(
+                        @PathVariable Long keywordId,
+                        Authentication authentication) {
+                return bookmarkService.saveKeywordBookmark(keywordId, authentication);
+        }
+
+        @DeleteMapping("/keywords/{keywordId}")
+        public Map<String, String> removeKeywordBookmark(
+                        @PathVariable Long keywordId,
+                        Authentication authentication) {
+                bookmarkService.removeKeywordBookmark(keywordId, authentication);
+
+                return Map.of("message", "Keyword bookmark removed successfully");
+        }
+
+        @GetMapping("/keywords")
+        public List<BookmarkResponse> getMyKeywordBookmarks(Authentication authentication) {
+                return bookmarkService.getMyKeywordBookmarks(authentication);
+        }
+
+        @GetMapping("/keywords/check/{keywordId}")
+        public Map<String, Boolean> checkKeywordBookmarked(
+                        @PathVariable Long keywordId,
+                        Authentication authentication) {
+                boolean bookmarked = bookmarkService.isKeywordBookmarked(keywordId, authentication);
+
+                return Map.of("bookmarked", bookmarked);
+        }
 }

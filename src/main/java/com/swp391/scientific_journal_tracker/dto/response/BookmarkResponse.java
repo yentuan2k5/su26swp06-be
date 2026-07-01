@@ -3,6 +3,7 @@ package com.swp391.scientific_journal_tracker.dto.response;
 import java.time.LocalDateTime;
 
 import com.swp391.scientific_journal_tracker.entity.Bookmark;
+import com.swp391.scientific_journal_tracker.entity.Keyword;
 import com.swp391.scientific_journal_tracker.entity.ResearchPaper;
 
 import lombok.AllArgsConstructor;
@@ -14,23 +15,43 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class BookmarkResponse {
     private Long bookmarkId;
+    private String bookmarkType;
+
     private Long paperId;
     private String title;
     private String authors;
     private Integer year;
     private String journalTitle;
+
+    private Long keywordId;
+    private String term;
+
     private LocalDateTime savedAt;
 
     public static BookmarkResponse fromEntity(Bookmark bookmark) {
-        ResearchPaper paper = bookmark.getResearchPaper();
+        BookmarkResponse response = new BookmarkResponse();
 
-        return new BookmarkResponse(
-                bookmark.getBookmarkId(),
-                paper.getResearchPaperId(),
-                paper.getTitle(),
-                paper.getAuthors(),
-                paper.getYear(),
-                paper.getJournal() != null ? paper.getJournal().getTitle() : null,
-                bookmark.getSavedAt());
+        response.setBookmarkId(bookmark.getBookmarkId());
+        response.setBookmarkType(bookmark.getBookmarkType());
+        response.setSavedAt(bookmark.getSavedAt());
+
+        if ("PAPER".equals(bookmark.getBookmarkType()) && bookmark.getResearchPaper() != null) {
+            ResearchPaper paper = bookmark.getResearchPaper();
+
+            response.setPaperId(paper.getResearchPaperId());
+            response.setTitle(paper.getTitle());
+            response.setAuthors(paper.getAuthors());
+            response.setYear(paper.getYear());
+            response.setJournalTitle(paper.getJournal() != null ? paper.getJournal().getTitle() : null);
+        }
+
+        if ("KEYWORD".equals(bookmark.getBookmarkType()) && bookmark.getKeyword() != null) {
+            Keyword keyword = bookmark.getKeyword();
+
+            response.setKeywordId(keyword.getKeywordId());
+            response.setTerm(keyword.getTerm());
+        }
+
+        return response;
     }
 }

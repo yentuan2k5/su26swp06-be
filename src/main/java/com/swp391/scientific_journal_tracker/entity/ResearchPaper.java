@@ -55,7 +55,8 @@ public class ResearchPaper {
     @ManyToMany
     @JoinTable(name = "paper_keywords", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "KeywordId"))
     private List<Keyword> keywords = new ArrayList<>();
-    @ManyToMany(mappedBy = "researchPapers")
+    @ManyToMany
+    @JoinTable(name = "paper_topics", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "ResearchTopicId"))
     private List<ResearchTopic> researchTopics = new ArrayList<>();
     @OneToMany(mappedBy = "researchPaper")
     private List<Bookmark> bookmarks = new ArrayList<>();

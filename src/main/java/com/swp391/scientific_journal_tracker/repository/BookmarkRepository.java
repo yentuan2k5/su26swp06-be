@@ -11,6 +11,10 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
 
         List<Bookmark> findByUserUserIdOrderBySavedAtDesc(Long userId);
 
+        List<Bookmark> findByUserUserIdAndBookmarkTypeOrderBySavedAtDesc(
+                        Long userId,
+                        String bookmarkType);
+
         boolean existsByUserUserIdAndResearchPaperResearchPaperId(
                         Long userId,
                         Long researchPaperId);
@@ -22,4 +26,16 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
         void deleteByUserUserIdAndResearchPaperResearchPaperId(
                         Long userId,
                         Long researchPaperId);
+
+        boolean existsByUserUserIdAndKeywordKeywordId(
+                        Long userId,
+                        Long keywordId);
+
+        Optional<Bookmark> findByUserUserIdAndKeywordKeywordId(
+                        Long userId,
+                        Long keywordId);
+
+        void deleteByUserUserIdAndKeywordKeywordId(
+                        Long userId,
+                        Long keywordId);
 }

@@ -4,11 +4,13 @@ import com.swp391.scientific_journal_tracker.dto.response.SyncLogResponse;
 import com.swp391.scientific_journal_tracker.entity.Journal;
 import com.swp391.scientific_journal_tracker.entity.Keyword;
 import com.swp391.scientific_journal_tracker.entity.ResearchPaper;
+import com.swp391.scientific_journal_tracker.entity.ResearchTopic;
 import com.swp391.scientific_journal_tracker.entity.SyncLog;
 import com.swp391.scientific_journal_tracker.entity.SyncLog.Status;
 import com.swp391.scientific_journal_tracker.repository.JournalRepository;
 import com.swp391.scientific_journal_tracker.repository.KeywordRepository;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
+import com.swp391.scientific_journal_tracker.repository.ResearchTopicRepository;
 import com.swp391.scientific_journal_tracker.repository.SyncLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +41,7 @@ public class SyncService {
     private final ResearchPaperRepository paperRepository;
     private final JournalRepository journalRepository;
     private final KeywordRepository keywordRepository;
+    private final ResearchTopicRepository researchTopicRepository;
 
     @Value("${openalex.sync.queries:computer science}")
     private String openAlexQueries;
@@ -78,8 +81,8 @@ public class SyncService {
 
                 for (Map<String, Object> paperData : papers) {
                     try {
-                        boolean saved = processOpenAlexWork(paperData);
-                        if (saved) {
+                        boolean isNewPaper = processOpenAlexWork(paperData);
+                        if (isNewPaper) {
                             totalSynced++;
                         }
                     } catch (Exception e) {
@@ -97,7 +100,8 @@ public class SyncService {
             syncLog.setStatus(totalSynced == 0 && totalFailed > 0 ? Status.FAILED : Status.SUCCESS);
             syncLog.setPaperSynced(totalSynced);
             if (totalFailed > 0) {
-                syncLog.setErrorMessage("Có " + totalFailed + " paper bị bỏ qua do lỗi. Xem backend log để biết chi tiết.");
+                syncLog.setErrorMessage(
+                        "Có " + totalFailed + " paper bị bỏ qua do lỗi. Xem backend log để biết chi tiết.");
             }
             syncLog.setFinishedAt(LocalDateTime.now());
             syncLog = syncLogRepository.save(syncLog);
@@ -141,11 +145,11 @@ public class SyncService {
             return false;
         }
 
-        if (paperRepository.existsByExternalId(externalId)) {
-            return false;
-        }
+        List<ResearchPaper> existingPapers = paperRepository.findByExternalId(externalId);
+        boolean isNewPaper = existingPapers.isEmpty();
 
-        ResearchPaper paper = new ResearchPaper();
+        ResearchPaper paper = isNewPaper ? new ResearchPaper() : existingPapers.get(0);
+
         paper.setExternalId(externalId);
         paper.setTitle(truncate(firstNonBlank(
                 getString(workData, "display_name"),
@@ -180,8 +184,14 @@ public class SyncService {
                 .collect(Collectors.toList());
         paper.setKeywords(keywords);
 
+        List<ResearchTopic> topics = extractOpenAlexTopicNames(workData).stream()
+                .map(this::upsertTopic)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        paper.setResearchTopics(topics);
+
         paperRepository.save(paper);
-        return true;
+        return isNewPaper;
     }
 
     private Journal upsertOpenAlexJournal(Map<?, ?> source, Map<String, Object> workData) {
@@ -227,6 +237,22 @@ public class SyncService {
                     Keyword kw = new Keyword();
                     kw.setTerm(safeTerm);
                     return keywordRepository.save(kw);
+                });
+    }
+
+    private ResearchTopic upsertTopic(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+
+        String safeName = truncate(name.trim(), 150);
+
+        return researchTopicRepository.findByNameIgnoreCase(safeName)
+                .orElseGet(() -> {
+                    ResearchTopic topic = new ResearchTopic();
+                    topic.setName(safeName);
+                    topic.setDescription("Imported from OpenAlex");
+                    return researchTopicRepository.save(topic);
                 });
     }
 
@@ -279,14 +305,35 @@ public class SyncService {
 
     private List<String> extractOpenAlexKeywordTerms(Map<String, Object> workData) {
         List<String> terms = new ArrayList<>();
+
         addDisplayNames(terms, workData.get("keywords"));
-        addDisplayNames(terms, workData.get("topics"));
 
         return terms.stream()
                 .map(String::trim)
                 .filter(term -> !term.isBlank())
                 .distinct()
                 .limit(10)
+                .toList();
+    }
+
+    private List<String> extractOpenAlexTopicNames(Map<String, Object> workData) {
+        List<String> topics = new ArrayList<>();
+
+        Map<?, ?> primaryTopic = asMap(workData.get("primary_topic"));
+        if (primaryTopic != null) {
+            String primaryTopicName = getString(primaryTopic, "display_name");
+            if (primaryTopicName != null) {
+                topics.add(primaryTopicName);
+            }
+        }
+
+        addDisplayNames(topics, workData.get("topics"));
+
+        return topics.stream()
+                .map(String::trim)
+                .filter(topic -> !topic.isBlank())
+                .distinct()
+                .limit(5)
                 .toList();
     }
 
