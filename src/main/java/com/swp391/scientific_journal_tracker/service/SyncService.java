@@ -42,6 +42,7 @@ public class SyncService {
     private final JournalRepository journalRepository;
     private final KeywordRepository keywordRepository;
     private final ResearchTopicRepository researchTopicRepository;
+    private final NotificationService notificationService;
 
     @Value("${openalex.sync.queries:computer science}")
     private String openAlexQueries;
@@ -190,7 +191,12 @@ public class SyncService {
                 .collect(Collectors.toList());
         paper.setResearchTopics(topics);
 
-        paperRepository.save(paper);
+        ResearchPaper savedPaper = paperRepository.save(paper);
+
+        if (isNewPaper) {
+            notificationService.createNewPaperNotifications(savedPaper);
+        }
+
         return isNewPaper;
     }
 

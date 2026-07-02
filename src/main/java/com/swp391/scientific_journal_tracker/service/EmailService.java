@@ -23,7 +23,7 @@ public class EmailService {
     @Value("${brevo.from.name}")
     private String fromName;
 
-    @Value("${app.frontend.url}")
+    @Value("${app.frontend-url}")
     private String frontendUrl;
 
     public void sendResetPasswordEmail(String toEmail, String token) {

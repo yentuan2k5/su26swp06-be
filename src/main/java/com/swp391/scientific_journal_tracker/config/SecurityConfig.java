@@ -81,6 +81,8 @@ public class SecurityConfig {
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers(
+                                                                "/login",
+                                                                "/login/**",
                                                                 "/login/oauth2/**",
                                                                 "/oauth2/**",
                                                                 "/error")
@@ -105,6 +107,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/topics/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/journals/**").permitAll()
                                                 .requestMatchers("/api/bookmarks/**").authenticated()
+                                                .requestMatchers("/api/notifications/**").authenticated()
 
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(ex -> ex
