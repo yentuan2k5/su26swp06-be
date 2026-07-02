@@ -8,7 +8,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
 
+import com.swp391.scientific_journal_tracker.entity.User;
+import com.swp391.scientific_journal_tracker.exception.DuplicateResourceException;
+import com.swp391.scientific_journal_tracker.repository.UserRepository;
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopicResponse;
 import com.swp391.scientific_journal_tracker.entity.ResearchTopic;
@@ -22,98 +26,178 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TopicService {
 
-    private final ResearchTopicRepository researchTopicRepository;
-    private final ResearchPaperRepository researchPaperRepository;
+        private final ResearchTopicRepository researchTopicRepository;
+        private final ResearchPaperRepository researchPaperRepository;
+        private final UserRepository userRepository;
 
-    @Transactional(readOnly = true)
-    public List<TopicResponse> getAllTopics() {
-        return researchTopicRepository.findAll(Sort.by("name").ascending())
-                .stream()
-                .map(TopicResponse::fromEntity)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<TopicResponse> searchTopics(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) {
-            return getAllTopics();
+        @Transactional(readOnly = true)
+        public List<TopicResponse> getAllTopics() {
+                return researchTopicRepository.findAll(Sort.by("name").ascending())
+                                .stream()
+                                .map(TopicResponse::fromEntity)
+                                .toList();
         }
 
-        return researchTopicRepository.searchTopics(keyword.trim())
-                .stream()
-                .map(TopicResponse::fromEntity)
-                .toList();
-    }
+        @Transactional(readOnly = true)
+        public List<TopicResponse> searchTopics(String keyword) {
+                if (keyword == null || keyword.trim().isEmpty()) {
+                        return getAllTopics();
+                }
 
-    @Transactional(readOnly = true)
-    public TopicResponse getTopicDetail(Long topicId) {
-        ResearchTopic topic = getTopicById(topicId);
-        return TopicResponse.fromEntity(topic);
-    }
+                return researchTopicRepository.searchTopics(keyword.trim())
+                                .stream()
+                                .map(TopicResponse::fromEntity)
+                                .toList();
+        }
 
-    @Transactional(readOnly = true)
-    public Page<PaperResponse> getPapersByTopicPage(Long topicId, int page, int size) {
-        ResearchTopic topic = getTopicById(topicId);
+        @Transactional(readOnly = true)
+        public TopicResponse getTopicDetail(Long topicId) {
+                ResearchTopic topic = getTopicById(topicId);
+                return TopicResponse.fromEntity(topic);
+        }
 
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                Sort.by("year").descending());
+        @Transactional(readOnly = true)
+        public Page<PaperResponse> getPapersByTopicPage(Long topicId, int page, int size) {
+                ResearchTopic topic = getTopicById(topicId);
 
-        return researchPaperRepository
-                .searchPapersAdvanced(
-                        null, // search
-                        null, // author
-                        null, // keyword
-                        null, // journal
-                        topic.getName(), // topic
-                        null, // year
-                        null, // yearFrom
-                        null, // yearTo
-                        pageable)
-                .map(PaperResponse::fromEntity);
-    }
+                Pageable pageable = PageRequest.of(
+                                page,
+                                size,
+                                Sort.by("year").descending());
 
-    @Transactional(readOnly = true)
-    public List<TopicResponse> getTrendingTopics(int limit) {
-        int safeLimit = Math.max(1, Math.min(limit, 20));
+                return researchPaperRepository
+                                .searchPapersAdvanced(
+                                                null, // search
+                                                null, // author
+                                                null, // keyword
+                                                null, // journal
+                                                topic.getName(), // topic
+                                                null, // year
+                                                null, // yearFrom
+                                                null, // yearTo
+                                                pageable)
+                                .map(PaperResponse::fromEntity);
+        }
 
-        return researchTopicRepository
-                .findTrendingTopics(PageRequest.of(0, safeLimit))
-                .stream()
-                .map(row -> new TopicResponse(
-                        ((Number) row[0]).longValue(),
-                        (String) row[1],
-                        (String) row[2],
-                        ((Number) row[3]).longValue(),
-                        ((Number) row[4]).longValue()))
-                .toList();
-    }
+        @Transactional(readOnly = true)
+        public List<TopicResponse> getTrendingTopics(int limit) {
+                int safeLimit = Math.max(1, Math.min(limit, 20));
 
-    public Page<PaperResponse> getPapersByTopic(Long topicId, int page, int size) {
-        ResearchTopic topic = getTopicById(topicId);
+                return researchTopicRepository
+                                .findTrendingTopics(PageRequest.of(0, safeLimit))
+                                .stream()
+                                .map(row -> new TopicResponse(
+                                                ((Number) row[0]).longValue(),
+                                                (String) row[1],
+                                                (String) row[2],
+                                                ((Number) row[3]).longValue(),
+                                                ((Number) row[4]).longValue()))
+                                .toList();
+        }
 
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                Sort.by("year").descending());
+        public Page<PaperResponse> getPapersByTopic(Long topicId, int page, int size) {
+                ResearchTopic topic = getTopicById(topicId);
 
-        return researchPaperRepository
-                .searchPapersAdvanced(
-                        null,
-                        null,
-                        null,
-                        null,
-                        topic.getName(),
-                        null,
-                        null,
-                        null,
-                        pageable)
-                .map(PaperResponse::fromEntity);
-    }
+                Pageable pageable = PageRequest.of(
+                                page,
+                                size,
+                                Sort.by("year").descending());
 
-    private ResearchTopic getTopicById(Long topicId) {
-        return researchTopicRepository.findById(topicId)
-                .orElseThrow(() -> new ResourceNotFoundException("Topic not found with id: " + topicId));
-    }
+                return researchPaperRepository
+                                .searchPapersAdvanced(
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                topic.getName(),
+                                                null,
+                                                null,
+                                                null,
+                                                pageable)
+                                .map(PaperResponse::fromEntity);
+        }
+
+        @Transactional
+        public TopicResponse followTopic(Long topicId, Authentication authentication) {
+                User user = getCurrentUser(authentication);
+                ResearchTopic topic = getTopicById(topicId);
+
+                boolean alreadyFollowed = user.getFollowingTopics()
+                                .stream()
+                                .anyMatch(t -> t.getResearchTopicId().equals(topicId));
+
+                if (alreadyFollowed) {
+                        throw new DuplicateResourceException("Topic already followed");
+                }
+
+                user.getFollowingTopics().add(topic);
+
+                boolean followerExists = topic.getFollowers()
+                                .stream()
+                                .anyMatch(u -> u.getUserId().equals(user.getUserId()));
+
+                if (!followerExists) {
+                        topic.getFollowers().add(user);
+                }
+
+                userRepository.save(user);
+
+                return TopicResponse.fromEntity(topic);
+        }
+
+        @Transactional
+        public TopicResponse unfollowTopic(Long topicId, Authentication authentication) {
+                User user = getCurrentUser(authentication);
+                ResearchTopic topic = getTopicById(topicId);
+
+                boolean removed = user.getFollowingTopics()
+                                .removeIf(t -> t.getResearchTopicId().equals(topicId));
+
+                if (!removed) {
+                        throw new ResourceNotFoundException("Topic follow not found");
+                }
+
+                topic.getFollowers()
+                                .removeIf(u -> u.getUserId().equals(user.getUserId()));
+
+                userRepository.save(user);
+
+                return TopicResponse.fromEntity(topic);
+        }
+
+        @Transactional(readOnly = true)
+        public List<TopicResponse> getMyFollowingTopics(Authentication authentication) {
+                User user = getCurrentUser(authentication);
+
+                return user.getFollowingTopics()
+                                .stream()
+                                .map(TopicResponse::fromEntity)
+                                .toList();
+        }
+
+        @Transactional(readOnly = true)
+        public boolean isTopicFollowed(Long topicId, Authentication authentication) {
+                User user = getCurrentUser(authentication);
+
+                return user.getFollowingTopics()
+                                .stream()
+                                .anyMatch(t -> t.getResearchTopicId().equals(topicId));
+        }
+
+        private User getCurrentUser(Authentication authentication) {
+                if (authentication == null || authentication.getName() == null) {
+                        throw new ResourceNotFoundException("User not authenticated");
+                }
+
+                String username = authentication.getName();
+
+                return userRepository.findByUsername(username)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        }
+
+        private ResearchTopic getTopicById(Long topicId) {
+                return researchTopicRepository.findById(topicId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Topic not found with id: " + topicId));
+        }
 }

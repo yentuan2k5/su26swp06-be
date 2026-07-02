@@ -1,6 +1,7 @@
 package com.swp391.scientific_journal_tracker.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,6 +9,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopicResponse;
@@ -36,6 +40,34 @@ public class TopicController {
     public List<TopicResponse> getTrendingTopics(
             @RequestParam(defaultValue = "10") int limit) {
         return topicService.getTrendingTopics(limit);
+    }
+
+    @GetMapping("/following")
+    public List<TopicResponse> getMyFollowingTopics(Authentication authentication) {
+        return topicService.getMyFollowingTopics(authentication);
+    }
+
+    @PostMapping("/{topicId}/follow")
+    public TopicResponse followTopic(
+            @PathVariable Long topicId,
+            Authentication authentication) {
+        return topicService.followTopic(topicId, authentication);
+    }
+
+    @DeleteMapping("/{topicId}/follow")
+    public TopicResponse unfollowTopic(
+            @PathVariable Long topicId,
+            Authentication authentication) {
+        return topicService.unfollowTopic(topicId, authentication);
+    }
+
+    @GetMapping("/{topicId}/follow/check")
+    public Map<String, Boolean> checkTopicFollowed(
+            @PathVariable Long topicId,
+            Authentication authentication) {
+        boolean followed = topicService.isTopicFollowed(topicId, authentication);
+
+        return Map.of("followed", followed);
     }
 
     @GetMapping("/{topicId}")

@@ -93,6 +93,15 @@ public class SecurityConfig {
                                                                 "/api/trends/**")
                                                 .permitAll()
 
+                                                .requestMatchers(
+                                                                "/api/journals/following",
+                                                                "/api/journals/*/follow",
+                                                                "/api/journals/*/follow/check",
+                                                                "/api/topics/following",
+                                                                "/api/topics/*/follow",
+                                                                "/api/topics/*/follow/check")
+                                                .authenticated()
+
                                                 .requestMatchers(HttpMethod.GET, "/api/topics/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/journals/**").permitAll()
                                                 .requestMatchers("/api/bookmarks/**").authenticated()
