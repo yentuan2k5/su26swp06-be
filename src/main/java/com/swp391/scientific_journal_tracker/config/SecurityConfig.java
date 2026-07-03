@@ -51,6 +51,8 @@ public class SecurityConfig {
                                 .csrf(AbstractHttpConfigurer::disable)
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                                 .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                                                 .requestMatchers(HttpMethod.POST,
                                                                 "/api/auth/register",
                                                                 "/api/auth/login",
@@ -80,7 +82,12 @@ public class SecurityConfig {
                                 .csrf(AbstractHttpConfigurer::disable)
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                                 .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                                                 .requestMatchers(
+                                                                "/",
+                                                                "/favicon.ico",
+                                                                "/api/health",
                                                                 "/login",
                                                                 "/login/**",
                                                                 "/login/oauth2/**",
