@@ -23,7 +23,7 @@ public class DashboardReport {
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     @Column(name = "DashboardReportId", nullable = false, unique = true)
     private Long dashboardReportId;
-    @Column(name = "Count", nullable = false, columnDefinition = "VarChar(255) COLLATE utf8mb4_unicode_ci")
+    @Column(name = "Title", nullable = false, columnDefinition = "VARCHAR(255) COLLATE utf8mb4_unicode_ci")
     private String title;
     @Column(name = "Content", columnDefinition = "Text COLLATE utf8mb4_unicode_ci")
     private String content;
