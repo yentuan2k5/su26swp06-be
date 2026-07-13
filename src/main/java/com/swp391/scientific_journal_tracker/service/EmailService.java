@@ -1,5 +1,7 @@
 package com.swp391.scientific_journal_tracker.service;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -7,12 +9,20 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.swp391.scientific_journal_tracker.exception.EmailSendingException;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class EmailService {
+
+    private final RestTemplate restTemplate;
 
     @Value("${brevo.api.key}")
     private String brevoApiKey;
@@ -27,13 +37,23 @@ public class EmailService {
     private String frontendUrl;
 
     public void sendResetPasswordEmail(String toEmail, String token) {
-        String resetLink = frontendUrl.replaceAll("/$", "") + "/reset-password?token=" + token;
+        String encodedToken = URLEncoder.encode(
+                token,
+                StandardCharsets.UTF_8);
+
+        String normalizedFrontendUrl = frontendUrl.replaceAll("/$", "");
+
+        String resetLink = normalizedFrontendUrl
+                + "/reset-password?token="
+                + encodedToken;
 
         String htmlContent = """
                 <h2>Reset Password</h2>
                 <p>You requested to reset your password.</p>
                 <p>Click the link below to reset your password:</p>
-                <p><a href="%s">Reset Password</a></p>
+                <p>
+                    <a href="%s">Reset Password</a>
+                </p>
                 <p>This link will expire soon.</p>
                 <p>If you did not request this, please ignore this email.</p>
                 """.formatted(resetLink);
@@ -60,15 +80,48 @@ public class EmailService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
-            RestTemplate restTemplate = new RestTemplate();
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            System.out.println("Brevo email sent: " + response.getBody());
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    url,
+                    request,
+                    String.class);
+
+            log.info(
+                    "Reset password email sent successfully to {} with status {}",
+                    maskEmail(toEmail),
+                    response.getStatusCode());
         } catch (HttpStatusCodeException e) {
-            throw new RuntimeException(
-                    "Brevo gửi mail lỗi: " + e.getStatusCode() + " - " + e.getResponseBodyAsString(),
+            log.error(
+                    "Brevo rejected reset password email request. Status: {}, response: {}",
+                    e.getStatusCode(),
+                    e.getResponseBodyAsString());
+
+            throw new EmailSendingException(
+                    "Unable to send reset password email",
                     e);
         } catch (RestClientException e) {
-            throw new RuntimeException("Không gửi được email reset password bằng Brevo", e);
+            log.error(
+                    "Failed to connect to Brevo while sending reset password email",
+                    e);
+
+            throw new EmailSendingException(
+                    "Unable to send reset password email",
+                    e);
         }
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+
+        String[] parts = email.split("@", 2);
+        String username = parts[0];
+        String domain = parts[1];
+
+        String maskedUsername = username.length() <= 2
+                ? "***"
+                : username.substring(0, 2) + "***";
+
+        return maskedUsername + "@" + domain;
     }
 }
