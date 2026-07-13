@@ -41,7 +41,7 @@ public class OAuth2RedirectOriginFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        if ("/oauth2/authorization/google".equals(request.getServletPath())) {
+        if ("/api/oauth2/authorization/google".equals(request.getServletPath())) {
             String redirectOrigin = request.getParameter("redirect_origin");
 
             if (isAllowedOrigin(redirectOrigin)) {
@@ -59,7 +59,8 @@ public class OAuth2RedirectOriginFilter extends OncePerRequestFilter {
     }
 
     private boolean isAllowedOrigin(String origin) {
-        if (origin == null || origin.isBlank()) return false;
+        if (origin == null || origin.isBlank())
+            return false;
 
         try {
             URI uri = URI.create(origin);

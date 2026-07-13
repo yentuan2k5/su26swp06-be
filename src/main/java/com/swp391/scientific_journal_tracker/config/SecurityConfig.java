@@ -92,6 +92,7 @@ public class SecurityConfig {
                                                                 "/login/**",
                                                                 "/login/oauth2/**",
                                                                 "/oauth2/**",
+                                                                "/api/oauth2/**",
                                                                 "/error")
                                                 .permitAll()
 
@@ -122,7 +123,10 @@ public class SecurityConfig {
                                                                 .sendError(HttpServletResponse.SC_UNAUTHORIZED,
                                                                                 "Unauthorized")))
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-                                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2SuccessHandler))
+                                .oauth2Login(oauth2 -> oauth2
+                                                .authorizationEndpoint(endpoint -> endpoint
+                                                                .baseUri("/api/oauth2/authorization"))
+                                                .successHandler(oAuth2SuccessHandler))
                                 .addFilterBefore(oAuth2RedirectOriginFilter, UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                                 .logout(logout -> logout
