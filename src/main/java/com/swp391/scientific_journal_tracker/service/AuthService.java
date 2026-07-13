@@ -133,25 +133,56 @@ public class AuthService {
     }
 
     // ── ĐẶT LẠI MẬT KHẨU ────────────────────────────────────
+    @Transactional
     public void resetPassword(ResetPasswordRequest req) {
 
-        if (!req.getNewPassword().equals(req.getConfirmPassword())) {
-            throw new RuntimeException("Mật khẩu xác nhận không khớp");
+        if (req.getToken() == null || req.getToken().isBlank()) {
+            throw new BadRequestException("Token đặt lại mật khẩu không được để trống");
+        }
+
+        if (req.getNewPassword() == null
+                || req.getConfirmPassword() == null
+                || !req.getNewPassword().equals(req.getConfirmPassword())) {
+
+            throw new BadRequestException("Mật khẩu xác nhận không khớp");
         }
 
         User user = userRepo.findByResetPasswordToken(req.getToken())
-                .orElseThrow(() -> new RuntimeException("Token không hợp lệ"));
+                .orElseThrow(() -> new BadRequestException("Token không hợp lệ"));
 
-        if (user.getResetTokenExpiry() == null ||
-                user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Token đã hết hạn, vui lòng yêu cầu lại");
+        if (user.getResetTokenExpiry() == null
+                || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+
+            /*
+             * Xóa token reset đã hết hạn để không tiếp tục lưu dữ liệu rác.
+             */
+            user.setResetPasswordToken(null);
+            user.setResetTokenExpiry(null);
+            userRepo.save(user);
+
+            throw new BadRequestException(
+                    "Token đã hết hạn, vui lòng yêu cầu lại");
         }
 
-        user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        /*
+         * Cập nhật mật khẩu mới.
+         */
+        user.setPasswordHash(
+                passwordEncoder.encode(req.getNewPassword()));
+
+        /*
+         * Reset token chỉ được sử dụng một lần.
+         */
         user.setResetPasswordToken(null);
         user.setResetTokenExpiry(null);
 
         userRepo.save(user);
+
+        /*
+         * Thu hồi tất cả refresh token cũ của tài khoản.
+         * Người dùng phải đăng nhập lại bằng mật khẩu mới.
+         */
+        refreshTokenRepository.deleteAllByUser(user);
     }
 
     // ── HELPER ───────────────────────────────────────────────
