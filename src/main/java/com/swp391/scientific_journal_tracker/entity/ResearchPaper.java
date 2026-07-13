@@ -16,7 +16,9 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Entity
 @Table(name = "ResearchPapers") // Table name in plural form
@@ -43,21 +45,37 @@ public class ResearchPaper {
     @Column(name = "SourceApi", nullable = false, columnDefinition = "VARCHAR(50) COLLATE utf8mb4_unicode_ci")
     private String sourceApi = "openalex"; // External metadata source
     @Column(name = "Authors", columnDefinition = "VARCHAR(1000) COLLATE utf8mb4_unicode_ci")
-    private String authors;
+    private String authorsRaw;
+
+    @ManyToMany
+    @JoinTable(name = "paper_authors", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "AuthorId"))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Author> authors = new ArrayList<>();
     @Column(name = "JournalId")
     private Long journalId;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "JournalId", insertable = false, updatable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Journal journal;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ApiDataSourceId", insertable = false, updatable = false)
+    @JoinColumn(name = "ApiDataSourceId")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private ApiDataSource apiDataSource;
     @ManyToMany
     @JoinTable(name = "paper_keywords", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "KeywordId"))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<Keyword> keywords = new ArrayList<>();
     @ManyToMany
     @JoinTable(name = "paper_topics", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "ResearchTopicId"))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<ResearchTopic> researchTopics = new ArrayList<>();
     @OneToMany(mappedBy = "researchPaper")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<Bookmark> bookmarks = new ArrayList<>();
 }

@@ -23,7 +23,8 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
 
     List<ResearchPaper> findByTitleContainingIgnoreCase(String title);
 
-    List<ResearchPaper> findByAuthorsContainingIgnoreCase(String author);
+    List<ResearchPaper> findDistinctByAuthors_FullNameContainingIgnoreCase(
+            String author);
 
     List<ResearchPaper> findByYear(Integer year);
 
@@ -69,15 +70,22 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
     List<Object[]> countTopJournals(Pageable pageable);
 
     @Query("""
-                SELECT DISTINCT p
-                FROM ResearchPaper p
-                LEFT JOIN p.keywords k
-                WHERE (:search IS NULL
-                    OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :search, '%')))
-                AND (:year IS NULL OR p.year = :year)
-                AND (:keyword IS NULL OR LOWER(k.term) = LOWER(:keyword))
+            SELECT DISTINCT p
+            FROM ResearchPaper p
+            LEFT JOIN p.keywords k
+            LEFT JOIN p.authors a
+            WHERE (
+                :search IS NULL
+                OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(a.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(p.authorsRaw) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+            AND (:year IS NULL OR p.year = :year)
+            AND (
+                :keyword IS NULL
+                OR LOWER(k.term) = LOWER(:keyword)
+            )
             """)
     Page<ResearchPaper> searchPapers(
             @Param("search") String search,
@@ -86,81 +94,87 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             Pageable pageable);
 
     @Query(value = """
-                SELECT DISTINCT p
-                FROM ResearchPaper p
-                LEFT JOIN p.keywords k
-                LEFT JOIN p.researchTopics t
-                LEFT JOIN p.journal j
-                WHERE
-                    (
-                        :search IS NULL
-                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                    )
-                    AND (
-                        :author IS NULL
-                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :author, '%'))
-                    )
-                    AND (
-                        :keyword IS NULL
-                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    )
-                    AND (
-                        :journal IS NULL
-                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :journal, '%'))
-                    )
-                    AND (
-                        :topic IS NULL
-                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
-                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :topic, '%'))
-                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :topic, '%'))
-                        OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :topic, '%'))
-                    )
-                    AND (:year IS NULL OR p.year = :year)
-                    AND (:yearFrom IS NULL OR p.year >= :yearFrom)
-                    AND (:yearTo IS NULL OR p.year <= :yearTo)
+            SELECT DISTINCT p
+            FROM ResearchPaper p
+            LEFT JOIN p.keywords k
+            LEFT JOIN p.researchTopics t
+            LEFT JOIN p.journal j
+            LEFT JOIN p.authors a
+            WHERE
+                (
+                    :search IS NULL
+                    OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(a.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.authorsRaw) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(k.term) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                )
+                AND (
+                    :author IS NULL
+                    OR LOWER(a.fullName) LIKE LOWER(CONCAT('%', :author, '%'))
+                    OR LOWER(p.authorsRaw) LIKE LOWER(CONCAT('%', :author, '%'))
+                )
+                AND (
+                    :keyword IS NULL
+                    OR LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+                AND (
+                    :journal IS NULL
+                    OR LOWER(j.title) LIKE LOWER(CONCAT('%', :journal, '%'))
+                )
+                AND (
+                    :topic IS NULL
+                    OR LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    OR LOWER(k.term) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    OR LOWER(p.title) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+                AND (:year IS NULL OR p.year = :year)
+                AND (:yearFrom IS NULL OR p.year >= :yearFrom)
+                AND (:yearTo IS NULL OR p.year <= :yearTo)
             """, countQuery = """
-                SELECT COUNT(DISTINCT p)
-                FROM ResearchPaper p
-                LEFT JOIN p.keywords k
-                LEFT JOIN p.researchTopics t
-                LEFT JOIN p.journal j
-                WHERE
-                    (
-                        :search IS NULL
-                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                    )
-                    AND (
-                        :author IS NULL
-                        OR LOWER(p.authors) LIKE LOWER(CONCAT('%', :author, '%'))
-                    )
-                    AND (
-                        :keyword IS NULL
-                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    )
-                    AND (
-                        :journal IS NULL
-                        OR LOWER(j.title) LIKE LOWER(CONCAT('%', :journal, '%'))
-                    )
-                    AND (
-                        :topic IS NULL
-                        OR LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
-                        OR LOWER(k.term) LIKE LOWER(CONCAT('%', :topic, '%'))
-                        OR LOWER(p.title) LIKE LOWER(CONCAT('%', :topic, '%'))
-                        OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :topic, '%'))
-                    )
-                    AND (:year IS NULL OR p.year = :year)
-                    AND (:yearFrom IS NULL OR p.year >= :yearFrom)
-                    AND (:yearTo IS NULL OR p.year <= :yearTo)
+            SELECT COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            LEFT JOIN p.keywords k
+            LEFT JOIN p.researchTopics t
+            LEFT JOIN p.journal j
+            LEFT JOIN p.authors a
+            WHERE
+                (
+                    :search IS NULL
+                    OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(a.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.authorsRaw) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(k.term) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                )
+                AND (
+                    :author IS NULL
+                    OR LOWER(a.fullName) LIKE LOWER(CONCAT('%', :author, '%'))
+                    OR LOWER(p.authorsRaw) LIKE LOWER(CONCAT('%', :author, '%'))
+                )
+                AND (
+                    :keyword IS NULL
+                    OR LOWER(k.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+                AND (
+                    :journal IS NULL
+                    OR LOWER(j.title) LIKE LOWER(CONCAT('%', :journal, '%'))
+                )
+                AND (
+                    :topic IS NULL
+                    OR LOWER(t.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    OR LOWER(k.term) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    OR LOWER(p.title) LIKE LOWER(CONCAT('%', :topic, '%'))
+                    OR LOWER(p.abstractText) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+                AND (:year IS NULL OR p.year = :year)
+                AND (:yearFrom IS NULL OR p.year >= :yearFrom)
+                AND (:yearTo IS NULL OR p.year <= :yearTo)
             """)
     Page<ResearchPaper> searchPapersAdvanced(
             @Param("search") String search,

@@ -12,6 +12,8 @@ import com.swp391.scientific_journal_tracker.repository.KeywordRepository;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
 import com.swp391.scientific_journal_tracker.repository.ResearchTopicRepository;
 import com.swp391.scientific_journal_tracker.repository.SyncLogRepository;
+import com.swp391.scientific_journal_tracker.entity.Author;
+import com.swp391.scientific_journal_tracker.repository.AuthorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,6 +45,7 @@ public class SyncService {
     private final KeywordRepository keywordRepository;
     private final ResearchTopicRepository researchTopicRepository;
     private final NotificationService notificationService;
+    private final AuthorRepository authorRepository;
 
     @Value("${openalex.sync.queries:computer science}")
     private String openAlexQueries;
@@ -170,7 +173,13 @@ public class SyncService {
             paper.setCitationCount(citationCount.intValue());
         }
 
-        paper.setAuthors(truncate(extractOpenAlexAuthors(workData), 1000));
+        // Giữ chuỗi tên tác giả cũ để hiển thị nhanh và tương thích code cũ
+        paper.setAuthorsRaw(
+                truncate(extractOpenAlexAuthors(workData), 1000));
+
+        // Lưu quan hệ chuẩn hóa ResearchPaper - Author
+        paper.setAuthors(
+                extractAndUpsertAuthors(workData));
 
         Map<?, ?> primaryLocation = asMap(workData.get("primary_location"));
         Map<?, ?> source = primaryLocation == null ? null : asMap(primaryLocation.get("source"));
@@ -198,6 +207,76 @@ public class SyncService {
         }
 
         return isNewPaper;
+    }
+
+    private List<Author> extractAndUpsertAuthors(
+            Map<String, Object> workData) {
+        Object authorshipsObj = workData.get("authorships");
+
+        if (!(authorshipsObj instanceof List<?> authorships)) {
+            return List.of();
+        }
+
+        return authorships.stream()
+                .map(this::asMap)
+                .filter(Objects::nonNull)
+                .map(authorship -> asMap(authorship.get("author")))
+                .filter(Objects::nonNull)
+                .map(authorData -> upsertAuthor(
+                        getString(authorData, "id"),
+                        getString(authorData, "display_name")))
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private Author upsertAuthor(
+            String externalId,
+            String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return null;
+        }
+
+        String safeName = truncate(fullName.trim(), 255);
+
+        String safeExternalId = externalId == null || externalId.isBlank()
+                ? null
+                : truncate(externalId.trim(), 100);
+
+        /*
+         * OpenAlex author ID là phương thức dedupe chính xác nhất.
+         */
+        if (safeExternalId != null) {
+            return authorRepository.findByExternalId(safeExternalId)
+                    .map(existingAuthor -> {
+                        // Cập nhật tên nếu OpenAlex thay đổi display_name
+                        if (!safeName.equals(existingAuthor.getFullName())) {
+                            existingAuthor.setFullName(safeName);
+                            return authorRepository.save(existingAuthor);
+                        }
+
+                        return existingAuthor;
+                    })
+                    .orElseGet(() -> {
+                        Author author = new Author();
+                        author.setExternalId(safeExternalId);
+                        author.setFullName(safeName);
+
+                        return authorRepository.save(author);
+                    });
+        }
+
+        /*
+         * Nếu không có OpenAlex ID thì tạm dedupe theo tên.
+         */
+        return authorRepository
+                .findFirstByFullNameIgnoreCase(safeName)
+                .orElseGet(() -> {
+                    Author author = new Author();
+                    author.setFullName(safeName);
+
+                    return authorRepository.save(author);
+                });
     }
 
     private Journal upsertOpenAlexJournal(Map<?, ?> source, Map<String, Object> workData) {

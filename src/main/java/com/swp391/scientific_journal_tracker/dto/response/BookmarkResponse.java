@@ -40,7 +40,7 @@ public class BookmarkResponse {
 
             response.setPaperId(paper.getResearchPaperId());
             response.setTitle(paper.getTitle());
-            response.setAuthors(paper.getAuthors());
+            response.setAuthors(paper.getAuthorsRaw());
             response.setYear(paper.getYear());
             response.setJournalTitle(paper.getJournal() != null ? paper.getJournal().getTitle() : null);
         }
