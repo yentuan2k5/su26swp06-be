@@ -7,8 +7,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.swp391.scientific_journal_tracker.entity.ApiDataSource;
 
-public interface ApiDataSourceRepository extends JpaRepository<ApiDataSource, Long> {
+public interface ApiDataSourceRepository
+        extends JpaRepository<ApiDataSource, Long> {
+
     Optional<ApiDataSource> findByName(String name);
+
+    Optional<ApiDataSource> findByNameIgnoreCase(String name);
 
     boolean existsByName(String name);
 

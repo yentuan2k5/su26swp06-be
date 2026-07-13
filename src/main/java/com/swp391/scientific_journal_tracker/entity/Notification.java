@@ -10,14 +10,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.*;
 
 @Entity
 @Table(name = "Notifications")
 @AllArgsConstructor
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 
 public class Notification {

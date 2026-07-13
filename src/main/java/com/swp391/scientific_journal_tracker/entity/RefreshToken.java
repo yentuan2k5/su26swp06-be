@@ -15,7 +15,8 @@ import lombok.*;
 @Entity
 @Table(name = "RefreshTokens")
 @AllArgsConstructor
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 public class RefreshToken {
     @Id

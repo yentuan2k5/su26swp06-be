@@ -11,8 +11,10 @@ import jakarta.persistence.Index;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "Keywords", indexes = {
@@ -20,7 +22,8 @@ import lombok.NoArgsConstructor;
 })
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Getter
+@Setter
 public class Keyword {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)

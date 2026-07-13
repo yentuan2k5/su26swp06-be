@@ -15,16 +15,18 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 @Entity
 @Table(name = "ResearchPapers") // Table name in plural form
 @AllArgsConstructor // Constructor with all fields
 @NoArgsConstructor // Default constructor
-@Data // Getters, Setters, toString, equals, and hashCode
+@Getter
+@Setter
 public class ResearchPaper {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)

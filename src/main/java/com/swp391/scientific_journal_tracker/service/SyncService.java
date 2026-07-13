@@ -12,7 +12,9 @@ import com.swp391.scientific_journal_tracker.repository.KeywordRepository;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
 import com.swp391.scientific_journal_tracker.repository.ResearchTopicRepository;
 import com.swp391.scientific_journal_tracker.repository.SyncLogRepository;
+import com.swp391.scientific_journal_tracker.entity.ApiDataSource;
 import com.swp391.scientific_journal_tracker.entity.Author;
+import com.swp391.scientific_journal_tracker.repository.ApiDataSourceRepository;
 import com.swp391.scientific_journal_tracker.repository.AuthorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,8 @@ import java.util.stream.Collectors;
 public class SyncService {
 
     private static final String SOURCE_OPENALEX = "openalex";
+    private static final String OPENALEX_SOURCE_NAME = "OpenAlex";
+    private static final String OPENALEX_BASE_URL = "https://api.openalex.org";
 
     private final OpenAlexClient openAlexClient;
     private final SyncLogRepository syncLogRepository;
@@ -46,6 +50,7 @@ public class SyncService {
     private final ResearchTopicRepository researchTopicRepository;
     private final NotificationService notificationService;
     private final AuthorRepository authorRepository;
+    private final ApiDataSourceRepository apiDataSourceRepository;
 
     @Value("${openalex.sync.queries:computer science}")
     private String openAlexQueries;
@@ -70,6 +75,8 @@ public class SyncService {
         int totalFailed = 0;
 
         try {
+            ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
+
             List<String> queries = getConfiguredQueries();
             int limit = getConfiguredLimit();
             log.info("OpenAlex sync config: queries={}, limit={}", queries, limit);
@@ -85,7 +92,7 @@ public class SyncService {
 
                 for (Map<String, Object> paperData : papers) {
                     try {
-                        boolean isNewPaper = processOpenAlexWork(paperData);
+                        boolean isNewPaper = processOpenAlexWork(paperData, openAlexSource);
                         if (isNewPaper) {
                             totalSynced++;
                         }
@@ -100,7 +107,8 @@ public class SyncService {
                     }
                 }
             }
-
+            openAlexSource.setLastSyncTime(LocalDateTime.now());
+            apiDataSourceRepository.save(openAlexSource);
             syncLog.setStatus(totalSynced == 0 && totalFailed > 0 ? Status.FAILED : Status.SUCCESS);
             syncLog.setPaperSynced(totalSynced);
             if (totalFailed > 0) {
@@ -143,7 +151,20 @@ public class SyncService {
         return Math.max(1, Math.min(openAlexLimit, 100));
     }
 
-    private boolean processOpenAlexWork(Map<String, Object> workData) {
+    private ApiDataSource getOrCreateOpenAlexDataSource() {
+        return apiDataSourceRepository
+                .findByNameIgnoreCase(OPENALEX_SOURCE_NAME)
+                .orElseGet(() -> {
+                    ApiDataSource source = new ApiDataSource();
+                    source.setName(OPENALEX_SOURCE_NAME);
+                    source.setBaseUrl(OPENALEX_BASE_URL);
+                    source.setLastSyncTime(null);
+
+                    return apiDataSourceRepository.save(source);
+                });
+    }
+
+    private boolean processOpenAlexWork(Map<String, Object> workData, ApiDataSource apiDataSource) {
         String externalId = getString(workData, "id");
         if (externalId == null) {
             return false;
@@ -159,10 +180,14 @@ public class SyncService {
                 getString(workData, "display_name"),
                 getString(workData, "title"),
                 "Untitled"), 500));
-        paper.setAbstractText(restoreOpenAlexAbstract(workData.get("abstract_inverted_index")));
-        paper.setSourceApi(SOURCE_OPENALEX);
-        paper.setDoi(truncate(normalizeDoi(getString(workData, "doi")), 200));
+        paper.setAbstractText(
+                restoreOpenAlexAbstract(workData.get("abstract_inverted_index")));
 
+        paper.setApiDataSource(apiDataSource);
+        paper.setSourceApi(SOURCE_OPENALEX);
+
+        paper.setDoi(truncate(
+                normalizeDoi(getString(workData, "doi")), 200));
         Object yearObj = workData.get("publication_year");
         if (yearObj instanceof Number year) {
             paper.setYear(year.intValue());

@@ -18,15 +18,17 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Builder
 @Entity
 @Table(name = "Users") // Table name in plural form
 @AllArgsConstructor // Constructor with all fields
 @NoArgsConstructor // Default constructor
-@Data // Getters, Setters, toString, equals, and hashCode
+@Getter
+@Setter
 public class User {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
