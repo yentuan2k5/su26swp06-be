@@ -17,9 +17,9 @@ public class SyncScheduler {
      * Chạy mỗi ngày lúc 2:00 AM
      * Cron format: giây phút giờ ngày tháng thứ
      */
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "0 38 2 * * *", zone = "Asia/Ho_Chi_Minh")
     public void scheduledSync() {
-        log.info("Scheduler kích hoạt sync tự động...");
+        log.info("Bắt đầu đồng bộ bài báo lúc 02:38 sáng...");
         syncService.syncFromOpenAlex();
     }
 
