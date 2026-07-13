@@ -64,13 +64,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                                                 .anyRequest().authenticated())
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                                .logout(logout -> logout
-                                                .logoutUrl("/api/auth/logout")
-                                                .invalidateHttpSession(true)
-                                                .clearAuthentication(true)
-                                                .deleteCookies("JSESSIONID")
-                                                .logoutSuccessHandler((req, res, auth) -> res.setStatus(200)));
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
                 return http.build();
         }
 

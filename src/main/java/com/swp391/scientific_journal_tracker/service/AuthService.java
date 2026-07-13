@@ -165,17 +165,49 @@ public class AuthService {
     }
 
     // ── REFRESH TOKEN ────────────────────────────────────────
+    @Transactional
     public AuthResponse refreshToken(String refreshToken) {
 
-        RefreshToken saved = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new BadRequestException("Refresh token không hợp lệ"));
-
-        if (saved.getExpiredAt().isBefore(LocalDateTime.now())) {
-            refreshTokenRepository.delete(saved);
-            throw new BadRequestException("Refresh token đã hết hạn, vui lòng đăng nhập lại");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BadRequestException(
+                    "Refresh token không được để trống");
+        }
+        /*
+         * Kiểm tra JWT trước:
+         * - Đúng chữ ký không?
+         * - Hết hạn chưa?
+         * - Có tokenType = REFRESH không?
+         */
+        if (!jwtService.isRefreshTokenValid(refreshToken)) {
+            throw new BadRequestException(
+                    "Refresh token không hợp lệ hoặc đã hết hạn");
         }
 
-        User user = saved.getUser();
+        /*
+         * Sau khi JWT hợp lệ mới kiểm tra token
+         * có đang tồn tại trong database không.
+         *
+         * Điều này cho phép logout bằng cách xóa token khỏi database.
+         */
+        RefreshToken savedToken = refreshTokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new BadRequestException(
+                        "Refresh token không tồn tại hoặc đã bị thu hồi"));
+
+        /*
+         * Kiểm tra thêm thời gian hết hạn được lưu trong database.
+         */
+        if (savedToken.getExpiredAt() == null
+                || savedToken.getExpiredAt().isBefore(LocalDateTime.now())) {
+
+            refreshTokenRepository.delete(savedToken);
+
+            throw new BadRequestException(
+                    "Refresh token đã hết hạn, vui lòng đăng nhập lại");
+        }
+
+        User user = savedToken.getUser();
+
+        // Chỉ cấp access token mới
         String newAccessToken = jwtService.generateToken(user.getUsername());
 
         return AuthResponse.builder()
@@ -186,7 +218,13 @@ public class AuthService {
     }
 
     // ── LOGOUT ───────────────────────────────────────────────
+    @Transactional
     public void logout(String refreshToken) {
+
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BadRequestException("Refresh token không được để trống");
+        }
+
         refreshTokenRepository.findByToken(refreshToken)
                 .ifPresent(refreshTokenRepository::delete);
     }

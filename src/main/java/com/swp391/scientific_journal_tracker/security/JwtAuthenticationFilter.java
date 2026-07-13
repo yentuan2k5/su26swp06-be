@@ -1,15 +1,19 @@
 package com.swp391.scientific_journal_tracker.security;
 
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import org.springframework.lang.NonNull;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.*;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
 
 @Component
@@ -24,31 +28,49 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
-        String path = request.getServletPath();
 
-        if (path.equals("/api/auth/register")
-                || path.equals("/api/auth/login")
-                || path.equals("/api/auth/forgot-password")
-                || path.equals("/api/auth/reset-password")
-                || path.equals("/api/auth/refresh-token")
-                || path.equals("/api/auth/logout")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // Lấy Authorization header
+        String authorizationHeader = request.getHeader("Authorization");
+
+        // Không có token thì cho request đi tiếp.
+        // SecurityConfig sẽ quyết định endpoint có được public không.
+        if (authorizationHeader == null
+                || !authorizationHeader.startsWith("Bearer ")) {
+
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
-        if (jwtService.isTokenValid(token)) {
-            String accessToken = jwtService.extractUsername(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(accessToken);
-            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userDetails, null,
+        // Bỏ phần "Bearer " để lấy JWT
+        String token = authorizationHeader.substring(7);
+
+        /*
+         * Chỉ access token mới được dùng để đăng nhập.
+         *
+         * Refresh token sẽ thất bại tại đây vì tokenType của nó
+         * là REFRESH chứ không phải ACCESS.
+         */
+        if (jwtService.isAccessTokenValid(token)
+                && SecurityContextHolder
+                        .getContext()
+                        .getAuthentication() == null) {
+
+            String username = jwtService.extractUsername(token);
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
                     userDetails.getAuthorities());
-            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource()
+                            .buildDetails(request));
+
+            SecurityContextHolder
+                    .getContext()
+                    .setAuthentication(authentication);
         }
 
         filterChain.doFilter(request, response);
