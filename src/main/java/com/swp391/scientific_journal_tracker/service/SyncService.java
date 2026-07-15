@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,17 +59,32 @@ public class SyncService {
     @Value("${openalex.sync.limit:10}")
     private int openAlexLimit;
 
+    @Value("${openalex.sync.overlap-days:1}")
+    private int openAlexOverlapDays;
+
     /**
      * Entry point chính, gọi từ Scheduler hoặc AdminController.
      */
     @Transactional
     public SyncLogResponse syncFromOpenAlex() {
+
+        /*
+         * Ghi lại thời điểm bắt đầu trước khi gọi OpenAlex.
+         *
+         * Sau khi sync thành công, LastSyncTime được cập nhật
+         * bằng thời điểm này thay vì thời điểm kết thúc.
+         *
+         * Nhờ vậy, dữ liệu phát sinh trong lúc sync đang chạy
+         * vẫn được kiểm tra lại ở lần sync sau.
+         */
+        LocalDateTime syncStartedAt = LocalDateTime.now();
+
         log.info("=== Bắt đầu sync từ OpenAlex ===");
 
         SyncLog syncLog = new SyncLog();
         syncLog.setSourceApi(SOURCE_OPENALEX);
         syncLog.setStatus(Status.RUNNING);
-        syncLog.setStartedAt(LocalDateTime.now());
+        syncLog.setStartedAt(syncStartedAt);
         syncLog = syncLogRepository.save(syncLog);
 
         int totalSynced = 0;
@@ -77,58 +93,126 @@ public class SyncService {
         try {
             ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
 
+            /*
+             * Lần đầu fromCreatedDate là null.
+             * Những lần sau lấy từ LastSyncTime và lùi thêm overlapDays.
+             */
+            LocalDate fromCreatedDate = resolveFromCreatedDate(openAlexSource);
+
             List<String> queries = getConfiguredQueries();
             int limit = getConfiguredLimit();
-            log.info("OpenAlex sync config: queries={}, limit={}", queries, limit);
+
+            log.info(
+                    "OpenAlex sync config: queries={}, limit={}, "
+                            + "lastSyncTime={}, fromCreatedDate={}",
+                    queries,
+                    limit,
+                    openAlexSource.getLastSyncTime(),
+                    fromCreatedDate);
 
             for (String query : queries) {
-                log.info("Đang fetch papers từ OpenAlex cho query: '{}'", query);
+                log.info(
+                        "Đang fetch paper từ OpenAlex. "
+                                + "query='{}', fromCreatedDate={}",
+                        query,
+                        fromCreatedDate);
 
-                List<Map<String, Object>> papers = openAlexClient.searchWorks(query, limit);
+                List<Map<String, Object>> papers = openAlexClient.searchWorks(
+                        query,
+                        limit,
+                        fromCreatedDate);
 
                 if (papers.isEmpty()) {
-                    log.warn("OpenAlex không trả paper nào cho query: '{}'", query);
+                    log.warn(
+                            "OpenAlex không trả paper nào. query='{}'",
+                            query);
                 }
 
                 for (Map<String, Object> paperData : papers) {
                     try {
-                        boolean isNewPaper = processOpenAlexWork(paperData, openAlexSource);
+                        boolean isNewPaper = processOpenAlexWork(
+                                paperData,
+                                openAlexSource);
+
                         if (isNewPaper) {
                             totalSynced++;
                         }
-                    } catch (Exception e) {
+
+                    } catch (Exception exception) {
                         totalFailed++;
-                        log.warn("Bỏ qua paper do lỗi. source={}, externalId={}, title={}, error={}",
+
+                        log.warn(
+                                "Bỏ qua paper do lỗi. "
+                                        + "source={}, externalId={}, "
+                                        + "title={}, error={}",
                                 SOURCE_OPENALEX,
                                 getString(paperData, "id"),
                                 getPaperLogTitle(paperData),
-                                e.getMessage(),
-                                e);
+                                exception.getMessage(),
+                                exception);
                     }
                 }
             }
-            openAlexSource.setLastSyncTime(LocalDateTime.now());
-            apiDataSourceRepository.save(openAlexSource);
-            syncLog.setStatus(totalSynced == 0 && totalFailed > 0 ? Status.FAILED : Status.SUCCESS);
+
+            /*
+             * Chỉ cập nhật LastSyncTime sau khi tất cả query
+             * đã được OpenAlex xử lý.
+             *
+             * Không dùng LocalDateTime.now() tại đây vì có thể
+             * tạo khoảng trống trong thời gian sync đang chạy.
+             */
+            /*
+             * Chỉ tiến mốc đồng bộ khi không có paper nào bị lỗi.
+             * Nếu có lỗi, giữ nguyên mốc cũ để lần sau thử lại.
+             */
+            if (totalFailed == 0) {
+                openAlexSource.setLastSyncTime(syncStartedAt);
+                apiDataSourceRepository.save(openAlexSource);
+            } else {
+                log.warn(
+                        "Không cập nhật LastSyncTime vì có {} paper bị lỗi",
+                        totalFailed);
+            }
+
+            syncLog.setStatus(
+                    totalSynced == 0 && totalFailed > 0
+                            ? Status.FAILED
+                            : Status.SUCCESS);
+
             syncLog.setPaperSynced(totalSynced);
+
             if (totalFailed > 0) {
                 syncLog.setErrorMessage(
-                        "Có " + totalFailed + " paper bị bỏ qua do lỗi. Xem backend log để biết chi tiết.");
+                        "Có " + totalFailed
+                                + " paper bị bỏ qua do lỗi. "
+                                + "Xem backend log để biết chi tiết.");
             }
+
             syncLog.setFinishedAt(LocalDateTime.now());
             syncLog = syncLogRepository.save(syncLog);
 
-            log.info("=== Sync hoàn tất từ OpenAlex: {} papers mới, {} papers lỗi ===",
-                    totalSynced, totalFailed);
+            log.info(
+                    "=== Sync OpenAlex hoàn tất: "
+                            + "{} paper mới, {} paper lỗi ===",
+                    totalSynced,
+                    totalFailed);
 
-        } catch (Exception e) {
+        } catch (Exception exception) {
+            /*
+             * Khi sync thất bại, LastSyncTime không bị cập nhật.
+             * Lần sau hệ thống sẽ thử lại từ mốc cũ.
+             */
             syncLog.setStatus(Status.FAILED);
             syncLog.setPaperSynced(totalSynced);
-            syncLog.setErrorMessage(e.getMessage());
+            syncLog.setErrorMessage(exception.getMessage());
             syncLog.setFinishedAt(LocalDateTime.now());
+
             syncLog = syncLogRepository.save(syncLog);
 
-            log.error("Sync từ OpenAlex thất bại: {}", e.getMessage(), e);
+            log.error(
+                    "Sync OpenAlex thất bại: {}",
+                    exception.getMessage(),
+                    exception);
         }
 
         return SyncLogResponse.from(syncLog);
@@ -149,6 +233,35 @@ public class SyncService {
 
     private int getConfiguredLimit() {
         return Math.max(1, Math.min(openAlexLimit, 100));
+    }
+
+    /**
+     * Xác định ngày OpenAlex tạo record bắt đầu cần lấy.
+     *
+     * Lần đầu:
+     * - LastSyncTime chưa có.
+     * - Trả về null để lấy các record mới nhất.
+     *
+     * Những lần sau:
+     * - Lấy ngày của LastSyncTime.
+     * - Lùi lại overlapDays để hạn chế bỏ sót dữ liệu.
+     */
+    private LocalDate resolveFromCreatedDate(
+            ApiDataSource openAlexSource) {
+        if (openAlexSource.getLastSyncTime() == null) {
+            log.info(
+                    "OpenAlex chưa từng sync. "
+                            + "Lần đầu lấy các record mới nhất.");
+
+            return null;
+        }
+
+        int safeOverlapDays = Math.max(openAlexOverlapDays, 0);
+
+        return openAlexSource
+                .getLastSyncTime()
+                .toLocalDate()
+                .minusDays(safeOverlapDays);
     }
 
     private ApiDataSource getOrCreateOpenAlexDataSource() {

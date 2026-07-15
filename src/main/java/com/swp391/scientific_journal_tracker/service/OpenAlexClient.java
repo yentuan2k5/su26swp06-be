@@ -5,8 +5,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.util.UriBuilder;
 
+import java.net.URI;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -16,19 +19,24 @@ import java.util.Map;
 public class OpenAlexClient {
 
     private static final String BASE_URL = "https://api.openalex.org";
+
     private static final String WORK_FIELDS = String.join(",",
             "id",
             "doi",
             "title",
             "display_name",
+            "publication_date",
             "publication_year",
+            "created_date",
+            "updated_date",
             "cited_by_count",
             "abstract_inverted_index",
             "authorships",
             "primary_location",
             "primary_topic",
             "keywords",
-            "topics");
+            "topics"
+    );
 
     private final WebClient webClient;
 
@@ -38,62 +46,168 @@ public class OpenAlexClient {
     public OpenAlexClient() {
         this.webClient = WebClient.builder()
                 .baseUrl(BASE_URL)
-                .codecs(config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024))
+                .codecs(configurer ->
+                        configurer.defaultCodecs()
+                                .maxInMemorySize(5 * 1024 * 1024)
+                )
                 .build();
     }
 
+    /**
+     * Lấy các công trình mới được thêm vào OpenAlex
+     * kể từ fromCreatedDate.
+     *
+     * fromCreatedDate = null nghĩa là lần sync đầu tiên.
+     */
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> searchWorks(String query, int limit) {
-        if (openAlexApiKey == null || openAlexApiKey.isBlank()) {
-            throw new RuntimeException("OpenAlex cần OPENALEX_API_KEY. Hãy tạo key ở https://openalex.org/settings/api");
+    public List<Map<String, Object>> searchWorks(
+            String query,
+            int limit,
+            LocalDate fromCreatedDate
+    ) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException(
+                    "OpenAlex search query không được để trống"
+            );
         }
+
+        if (openAlexApiKey == null || openAlexApiKey.isBlank()) {
+            throw new IllegalStateException(
+                    "Thiếu OPENALEX_API_KEY. "
+                            + "Hãy cấu hình API key trước khi đồng bộ"
+            );
+        }
+
+        /*
+         * OpenAlex cho phép per_page từ 1 đến 100.
+         */
+        int safeLimit = Math.max(1, Math.min(limit, 100));
 
         try {
             Map<String, Object> response = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/works")
-                            .queryParam("search", query)
-                            .queryParam("per_page", limit)
-                            .queryParam("select", WORK_FIELDS)
-                            .queryParam("api_key", openAlexApiKey.trim())
-                            .build())
+                    .uri(uriBuilder -> buildWorksUri(
+                            uriBuilder,
+                            query.trim(),
+                            safeLimit,
+                            fromCreatedDate
+                    ))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .timeout(Duration.ofSeconds(20))
                     .block();
 
-            if (response == null || !response.containsKey("results")) {
-                log.warn("OpenAlex trả về response rỗng cho query: {}", query);
+            if (response == null) {
+                log.warn(
+                        "OpenAlex trả về response null. query={}",
+                        query
+                );
+
                 return Collections.emptyList();
             }
 
-            Object results = response.get("results");
+            Object resultsObject = response.get("results");
 
-            if (!(results instanceof List<?>)) {
-                log.warn("OpenAlex field results không phải List, query={}", query);
+            if (!(resultsObject instanceof List<?>)) {
+                log.warn(
+                        "OpenAlex không trả về results dạng List. query={}",
+                        query
+                );
+
                 return Collections.emptyList();
             }
 
-            List<Map<String, Object>> works = (List<Map<String, Object>>) results;
-            log.info("OpenAlex query '{}' trả về {} works", query, works.size());
+            List<Map<String, Object>> works =
+                    (List<Map<String, Object>>) resultsObject;
+
+            log.info(
+                    "OpenAlex query='{}', fromCreatedDate={}, "
+                            + "limit={}, returned={}",
+                    query,
+                    fromCreatedDate,
+                    safeLimit,
+                    works.size()
+            );
 
             return works;
 
-        } catch (WebClientResponseException e) {
-            if (e.getStatusCode().value() == 429) {
-                log.error("OpenAlex bị rate limit 429. Query={}. Body={}",
-                        query, e.getResponseBodyAsString(), e);
-                throw new RuntimeException("OpenAlex rate limit 429. Hãy giảm OPENALEX_SYNC_LIMIT hoặc thử lại sau.", e);
+        } catch (WebClientResponseException exception) {
+            int statusCode = exception.getStatusCode().value();
+
+            if (statusCode == 429) {
+                log.error(
+                        "OpenAlex rate limit 429. query={}, body={}",
+                        query,
+                        exception.getResponseBodyAsString(),
+                        exception
+                );
+
+                throw new IllegalStateException(
+                        "OpenAlex đang giới hạn request. "
+                                + "Hãy thử lại sau",
+                        exception
+                );
             }
 
-            log.error("OpenAlex API lỗi HTTP {}. Query={}. Body={}",
-                    e.getStatusCode(), query, e.getResponseBodyAsString(), e);
+            log.error(
+                    "OpenAlex HTTP error. status={}, query={}, body={}",
+                    statusCode,
+                    query,
+                    exception.getResponseBodyAsString(),
+                    exception
+            );
 
-            throw new RuntimeException("OpenAlex API error: " + e.getMessage(), e);
+            throw new IllegalStateException(
+                    "OpenAlex API trả lỗi HTTP " + statusCode,
+                    exception
+            );
 
-        } catch (Exception e) {
-            log.error("Lỗi khi gọi OpenAlex API, query={}: {}", query, e.getMessage(), e);
-            throw new RuntimeException("OpenAlex API error: " + e.getMessage(), e);
+        } catch (Exception exception) {
+            log.error(
+                    "Không thể gọi OpenAlex. query={}, error={}",
+                    query,
+                    exception.getMessage(),
+                    exception
+            );
+
+            throw new IllegalStateException(
+                    "Không thể gọi OpenAlex API: "
+                            + exception.getMessage(),
+                    exception
+            );
         }
+    }
+
+    /**
+     * Tạo URL gọi OpenAlex.
+     *
+     * Lần đầu:
+     * - Không có filter.
+     * - Lấy các record mới được OpenAlex tạo gần đây nhất.
+     *
+     * Những lần sau:
+     * - Chỉ lấy record được OpenAlex tạo từ fromCreatedDate.
+     */
+    private URI buildWorksUri(
+            UriBuilder uriBuilder,
+            String query,
+            int limit,
+            LocalDate fromCreatedDate
+    ) {
+        UriBuilder builder = uriBuilder
+                .path("/works")
+                .queryParam("search", query)
+                .queryParam("per_page", limit)
+                .queryParam("sort", "created_date:desc")
+                .queryParam("select", WORK_FIELDS)
+                .queryParam("api_key", openAlexApiKey.trim());
+
+        if (fromCreatedDate != null) {
+            builder.queryParam(
+                    "filter",
+                    "from_created_date:" + fromCreatedDate
+            );
+        }
+
+        return builder.build();
     }
 }
