@@ -17,6 +17,7 @@ import com.swp391.scientific_journal_tracker.entity.User;
 import com.swp391.scientific_journal_tracker.exception.ResourceNotFoundException;
 import com.swp391.scientific_journal_tracker.repository.JournalRepository;
 import com.swp391.scientific_journal_tracker.repository.NotificationRepository;
+import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
 import com.swp391.scientific_journal_tracker.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final JournalRepository journalRepository;
+    private final ResearchPaperRepository paperRepository;
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getMyNotifications(Authentication authentication) {
@@ -103,10 +105,18 @@ public class NotificationService {
     }
 
     @Transactional
-    public void createNewPaperNotifications(ResearchPaper paper) {
-        if (paper == null || paper.getResearchPaperId() == null) {
-            return;
-        }
+    public void createNewPaperNotifications(
+            Long researchPaperId) {
+        ResearchPaper paper = paperRepository
+                .findById(researchPaperId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Không tìm thấy paper để tạo notification: "
+                                + researchPaperId));
+
+        /*
+         * Giữ nguyên toàn bộ logic tạo notification hiện tại phía dưới.
+         * Từ đây dùng biến paper vừa query lại từ database.
+         */
 
         Map<Long, User> recipients = new LinkedHashMap<>();
 

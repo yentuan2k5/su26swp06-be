@@ -21,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -65,7 +64,6 @@ public class SyncService {
     /**
      * Entry point chính, gọi từ Scheduler hoặc AdminController.
      */
-    @Transactional
     public SyncLogResponse syncFromOpenAlex() {
 
         /*
@@ -85,6 +83,7 @@ public class SyncService {
         syncLog.setSourceApi(SOURCE_OPENALEX);
         syncLog.setStatus(Status.RUNNING);
         syncLog.setStartedAt(syncStartedAt);
+        syncLog.setPaperSynced(0);
         syncLog = syncLogRepository.save(syncLog);
 
         int totalSynced = 0;
@@ -155,13 +154,6 @@ public class SyncService {
             }
 
             /*
-             * Chỉ cập nhật LastSyncTime sau khi tất cả query
-             * đã được OpenAlex xử lý.
-             *
-             * Không dùng LocalDateTime.now() tại đây vì có thể
-             * tạo khoảng trống trong thời gian sync đang chạy.
-             */
-            /*
              * Chỉ tiến mốc đồng bộ khi không có paper nào bị lỗi.
              * Nếu có lỗi, giữ nguyên mốc cũ để lần sau thử lại.
              */
@@ -170,7 +162,8 @@ public class SyncService {
                 apiDataSourceRepository.save(openAlexSource);
             } else {
                 log.warn(
-                        "Không cập nhật LastSyncTime vì có {} paper bị lỗi",
+                        "Không cập nhật LastSyncTime "
+                                + "vì có {} paper bị lỗi",
                         totalFailed);
             }
 
@@ -186,10 +179,12 @@ public class SyncService {
                         "Có " + totalFailed
                                 + " paper bị bỏ qua do lỗi. "
                                 + "Xem backend log để biết chi tiết.");
+            } else {
+                syncLog.setErrorMessage(null);
             }
 
             syncLog.setFinishedAt(LocalDateTime.now());
-            syncLog = syncLogRepository.save(syncLog);
+            SyncLog savedLog = syncLogRepository.save(syncLog);
 
             log.info(
                     "=== Sync OpenAlex hoàn tất: "
@@ -197,25 +192,31 @@ public class SyncService {
                     totalSynced,
                     totalFailed);
 
+            // Return cho trường hợp sync chạy xong bình thường.
+            return SyncLogResponse.from(savedLog);
+
         } catch (Exception exception) {
-            /*
-             * Khi sync thất bại, LastSyncTime không bị cập nhật.
-             * Lần sau hệ thống sẽ thử lại từ mốc cũ.
-             */
-            syncLog.setStatus(Status.FAILED);
-            syncLog.setPaperSynced(totalSynced);
-            syncLog.setErrorMessage(exception.getMessage());
-            syncLog.setFinishedAt(LocalDateTime.now());
-
-            syncLog = syncLogRepository.save(syncLog);
-
             log.error(
-                    "Sync OpenAlex thất bại: {}",
+                    "Sync OpenAlex thất bại. Root cause: {}",
                     exception.getMessage(),
                     exception);
-        }
 
-        return SyncLogResponse.from(syncLog);
+            syncLog.setStatus(Status.FAILED);
+
+            // File của bạn dùng totalSynced, không có biến paperSynced.
+            syncLog.setPaperSynced(totalSynced);
+
+            syncLog.setErrorMessage(
+                    exception.getMessage() == null
+                            ? "Không xác định được lỗi sync"
+                            : exception.getMessage());
+
+            syncLog.setFinishedAt(LocalDateTime.now());
+
+            SyncLog savedLog = syncLogRepository.save(syncLog);
+
+            return SyncLogResponse.from(savedLog);
+        }
     }
 
     private List<String> getConfiguredQueries() {
@@ -341,7 +342,7 @@ public class SyncService {
         ResearchPaper savedPaper = paperRepository.save(paper);
 
         if (isNewPaper) {
-            notificationService.createNewPaperNotifications(savedPaper);
+            notificationService.createNewPaperNotifications(savedPaper.getResearchPaperId());
         }
 
         return isNewPaper;

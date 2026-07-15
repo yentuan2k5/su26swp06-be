@@ -209,6 +209,35 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             """)
     List<Object[]> getTrendByTopic(@Param("topic") String topic);
 
+    /**
+     * Đếm số lượng paper theo từng năm thuộc một lĩnh vực cụ thể.
+     *
+     * Query đi từ ResearchPaper sang Journal vì field đang được lưu trong
+     * Journal.field, không nằm trực tiếp trong ResearchPaper.
+     *
+     * LEFT JOIN được sử dụng vì một số paper có thể chưa được gắn journal.
+     * Những paper không có journal hoặc không có field sẽ được loại khỏi
+     * kết quả bằng điều kiện j.field IS NOT NULL.
+     *
+     * COUNT(DISTINCT p) tránh trường hợp một paper bị đếm trùng.
+     *
+     * @param field tên lĩnh vực cần phân tích, ví dụ "Computer Science"
+     * @return danh sách Object[] gồm [year, paperCount], sắp xếp năm tăng dần
+     */
+    @Query("""
+            SELECT p.year, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            LEFT JOIN p.journal j
+            WHERE p.year IS NOT NULL
+            AND j.field IS NOT NULL
+            AND TRIM(j.field) <> ''
+            AND LOWER(j.field) LIKE LOWER(CONCAT('%', :field, '%'))
+            GROUP BY p.year
+            ORDER BY p.year ASC
+            """)
+    List<Object[]> getTrendByField(
+            @Param("field") String field);
+
     @Query("""
                 SELECT t.name, COUNT(DISTINCT p)
                 FROM ResearchPaper p
