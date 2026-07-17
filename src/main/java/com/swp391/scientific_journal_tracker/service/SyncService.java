@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 public class SyncService {
 
     private static final String SOURCE_OPENALEX = "openalex";
+    private static final String SOURCE_OPENALEX_BACKFILL = "openalex-backfill";
     private static final String OPENALEX_SOURCE_NAME = "OpenAlex";
     private static final String OPENALEX_BASE_URL = "https://api.openalex.org";
 
@@ -52,14 +53,17 @@ public class SyncService {
     private final AuthorRepository authorRepository;
     private final ApiDataSourceRepository apiDataSourceRepository;
 
-    @Value("${openalex.sync.queries:computer science}")
-    private String openAlexQueries;
+    @Value("${openalex.sync.field-ids:17}")
+    private String openAlexFieldIds;
 
     @Value("${openalex.sync.limit:10}")
     private int openAlexLimit;
 
     @Value("${openalex.sync.overlap-days:1}")
     private int openAlexOverlapDays;
+
+    @Value("${openalex.backfill.max-results-per-concept:5000}")
+    private int maxResultsPerConcept;
 
     /**
      * Entry point chính, gọi từ Scheduler hoặc AdminController.
@@ -98,33 +102,37 @@ public class SyncService {
              */
             LocalDate fromCreatedDate = resolveFromCreatedDate(openAlexSource);
 
-            List<String> queries = getConfiguredQueries();
+            List<String> fieldIds = getConfiguredFieldIds();
             int limit = getConfiguredLimit();
 
             log.info(
-                    "OpenAlex sync config: queries={}, limit={}, "
+                    "OpenAlex sync config: fieldIds={}, limit={}, "
                             + "lastSyncTime={}, fromCreatedDate={}",
-                    queries,
+                    fieldIds,
                     limit,
                     openAlexSource.getLastSyncTime(),
                     fromCreatedDate);
 
-            for (String query : queries) {
-                log.info(
-                        "Đang fetch paper từ OpenAlex. "
-                                + "query='{}', fromCreatedDate={}",
-                        query,
+            for (String fieldId : fieldIds) {
+                String filter = buildIncrementalFieldFilter(
+                        fieldId,
                         fromCreatedDate);
 
-                List<Map<String, Object>> papers = openAlexClient.searchWorks(
-                        query,
-                        limit,
-                        fromCreatedDate);
+                log.info(
+                        "Đang fetch paper từ OpenAlex. "
+                                + "fieldId={}, filter={}",
+                        fieldId,
+                        filter);
+
+                List<Map<String, Object>> papers = openAlexClient.fetchWorksByFilter(
+                        filter,
+                        limit);
 
                 if (papers.isEmpty()) {
                     log.warn(
-                            "OpenAlex không trả paper nào. query='{}'",
-                            query);
+                            "OpenAlex không trả paper nào. fieldId={}, filter={}",
+                            fieldId,
+                            filter);
                 }
 
                 for (Map<String, Object> paperData : papers) {
@@ -219,17 +227,226 @@ public class SyncService {
         }
     }
 
-    private List<String> getConfiguredQueries() {
-        List<String> queries = Arrays.stream((openAlexQueries == null ? "" : openAlexQueries).split(","))
-                .map(String::trim)
-                .filter(query -> !query.isBlank())
-                .toList();
-
-        if (queries.isEmpty()) {
-            return List.of("computer science");
+    /**
+     * Backfill dữ liệu lịch sử từ OpenAlex theo field và năm xuất bản.
+     *
+     * Luồng này không cập nhật ApiDataSource.lastSyncTime vì mốc đó
+     * thuộc riêng incremental sync.
+     */
+    public SyncLogResponse backfillFromOpenAlex(
+            int fromYear,
+            int toYear,
+            List<String> fieldIds) {
+        if (fromYear > toYear) {
+            throw new IllegalArgumentException(
+                    "fromYear không được lớn hơn toYear");
         }
 
-        return queries;
+        List<String> safeFieldIds = normalizeOpenAlexFieldIds(fieldIds);
+
+        if (safeFieldIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Danh sách fieldIds không được để trống");
+        }
+
+        int safeMaxResultsPerConcept = Math.max(
+                1,
+                maxResultsPerConcept);
+
+        LocalDateTime backfillStartedAt = LocalDateTime.now();
+
+        log.info(
+                "=== Bắt đầu backfill OpenAlex: fromYear={}, "
+                        + "toYear={}, fieldIds={}, maxResultsPerConcept={} ===",
+                fromYear,
+                toYear,
+                safeFieldIds,
+                safeMaxResultsPerConcept);
+
+        SyncLog syncLog = new SyncLog();
+        syncLog.setSourceApi(SOURCE_OPENALEX_BACKFILL);
+        syncLog.setStatus(Status.RUNNING);
+        syncLog.setStartedAt(backfillStartedAt);
+        syncLog.setPaperSynced(0);
+        syncLog = syncLogRepository.save(syncLog);
+
+        int totalSynced = 0;
+        int totalFailed = 0;
+
+        try {
+            ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
+
+            for (String fieldId : safeFieldIds) {
+                String filter = buildBackfillFilter(
+                        fieldId,
+                        fromYear,
+                        toYear);
+
+                log.info(
+                        "Đang backfill OpenAlex. fieldId={}, filter={}",
+                        fieldId,
+                        filter);
+
+                List<Map<String, Object>> papers = openAlexClient.fetchWorksByFilter(
+                        filter,
+                        safeMaxResultsPerConcept);
+
+                if (papers.isEmpty()) {
+                    log.warn(
+                            "OpenAlex không trả paper nào khi backfill. "
+                                    + "fieldId={}, filter={}",
+                            fieldId,
+                            filter);
+                }
+
+                for (Map<String, Object> paperData : papers) {
+                    try {
+                        boolean isNewPaper = processOpenAlexWork(
+                                paperData,
+                                openAlexSource);
+
+                        if (isNewPaper) {
+                            totalSynced++;
+                        }
+
+                    } catch (Exception exception) {
+                        totalFailed++;
+
+                        log.warn(
+                                "Bỏ qua paper backfill do lỗi. "
+                                        + "source={}, fieldId={}, externalId={}, "
+                                        + "title={}, error={}",
+                                SOURCE_OPENALEX_BACKFILL,
+                                fieldId,
+                                getString(paperData, "id"),
+                                getPaperLogTitle(paperData),
+                                exception.getMessage(),
+                                exception);
+                    }
+                }
+            }
+
+            syncLog.setStatus(
+                    totalSynced == 0 && totalFailed > 0
+                            ? Status.FAILED
+                            : Status.SUCCESS);
+
+            syncLog.setPaperSynced(totalSynced);
+
+            if (totalFailed > 0) {
+                syncLog.setErrorMessage(
+                        "Có " + totalFailed
+                                + " paper backfill bị bỏ qua do lỗi. "
+                                + "Xem backend log để biết chi tiết.");
+            } else {
+                syncLog.setErrorMessage(null);
+            }
+
+            syncLog.setFinishedAt(LocalDateTime.now());
+            SyncLog savedLog = syncLogRepository.save(syncLog);
+
+            log.info(
+                    "=== Backfill OpenAlex hoàn tất: "
+                            + "{} paper mới, {} paper lỗi ===",
+                    totalSynced,
+                    totalFailed);
+
+            return SyncLogResponse.from(savedLog);
+
+        } catch (Exception exception) {
+            log.error(
+                    "Backfill OpenAlex thất bại. Root cause: {}",
+                    exception.getMessage(),
+                    exception);
+
+            syncLog.setStatus(Status.FAILED);
+            syncLog.setPaperSynced(totalSynced);
+            syncLog.setErrorMessage(
+                    exception.getMessage() == null
+                            ? "Không xác định được lỗi backfill"
+                            : exception.getMessage());
+            syncLog.setFinishedAt(LocalDateTime.now());
+
+            SyncLog savedLog = syncLogRepository.save(syncLog);
+
+            return SyncLogResponse.from(savedLog);
+        }
+    }
+
+    private List<String> normalizeOpenAlexFieldIds(List<String> fieldIds) {
+        if (fieldIds == null) {
+            return List.of();
+        }
+
+        return fieldIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .map(this::normalizeOpenAlexFieldId)
+                .filter(fieldId -> !fieldId.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private String buildBackfillFilter(
+            String fieldId,
+            int fromYear,
+            int toYear) {
+        /*
+         * OpenAlex filter không dùng search free-text.
+         * Computer Science là field id 17 trong topic hierarchy.
+         *
+         * Dùng primary_topic.field.id để lấy paper có lĩnh vực chính
+         * thuộc field đó, thay vì tìm chữ "computer science" trong text.
+         *
+         * Với range năm, dùng 2 filter inequality để tránh cú pháp
+         * publication_year:2021-2026 không tương thích.
+         */
+        if (fromYear == toYear) {
+            return "primary_topic.field.id:" + fieldId
+                    + ",publication_year:" + fromYear;
+        }
+
+        return "primary_topic.field.id:" + fieldId
+                + ",publication_year:>" + (fromYear - 1)
+                + ",publication_year:<" + (toYear + 1);
+    }
+
+    private List<String> getConfiguredFieldIds() {
+        List<String> fieldIds = Arrays.stream((openAlexFieldIds == null ? "" : openAlexFieldIds).split(","))
+                .map(String::trim)
+                .map(this::normalizeOpenAlexFieldId)
+                .filter(fieldId -> !fieldId.isBlank())
+                .distinct()
+                .toList();
+
+        if (fieldIds.isEmpty()) {
+            return List.of("17");
+        }
+
+        return fieldIds;
+    }
+
+    private String normalizeOpenAlexFieldId(String fieldId) {
+        if (fieldId == null || fieldId.isBlank()) {
+            return "";
+        }
+
+        return fieldId.trim()
+                .replace("https://openalex.org/fields/", "")
+                .replace("http://openalex.org/fields/", "")
+                .replace("fields/", "");
+    }
+
+    private String buildIncrementalFieldFilter(
+            String fieldId,
+            LocalDate fromCreatedDate) {
+        String filter = "primary_topic.field.id:" + fieldId;
+
+        if (fromCreatedDate != null) {
+            filter += ",from_created_date:" + fromCreatedDate;
+        }
+
+        return filter;
     }
 
     private int getConfiguredLimit() {

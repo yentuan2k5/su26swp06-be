@@ -3,7 +3,7 @@ package com.swp391.scientific_journal_tracker.service;
 import java.time.Year;
 import java.util.List;
 
-import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +25,11 @@ import lombok.RequiredArgsConstructor;
 public class TrendService {
 
         private final ResearchPaperRepository researchPaperRepository;
+
+        private static final int DEFAULT_TOPIC_TREND_PERIOD_YEARS = 5;
+
+        @Value("${trend.min-papers-threshold:30}")
+        private int minPapersThreshold;
 
         /**
          * Lấy số lượng paper theo từng năm cho một keyword.
@@ -89,14 +94,31 @@ public class TrendService {
         }
 
         /**
-         * Lấy những topic có tổng số lượng paper cao nhất từ một năm cụ thể.
+         * Lấy những topic đang tăng trưởng mạnh trong giai đoạn gần đây.
          *
          * Limit được giới hạn từ 1 đến 20 để tránh trả về quá nhiều dữ liệu.
-         * Nếu fromYear không được truyền vào, hệ thống dùng 5 năm gần nhất.
+         * Nếu fromYear không được truyền vào, hệ thống dùng 5 năm gần nhất
+         * làm recentPeriod và lấy thêm một giai đoạn liền trước có cùng độ dài
+         * để so sánh.
+         *
+         * Công thức growth rate:
+         * growthRate = (recentCount - previousCount) / previousCount.
+         * Nếu previousCount = 0, hệ thống coi topic tăng 100% khi recentCount > 0
+         * để tránh chia cho 0.
+         *
+         * minPapersThreshold loại các topic có tổng số paper quá nhỏ trong cả
+         * hai giai đoạn. Việc này giúp tránh nhiễu thống kê, ví dụ topic tăng
+         * từ 2 lên 5 paper nhìn có vẻ tăng rất mạnh nhưng chưa đủ dữ liệu để
+         * xem là xu hướng đáng tin.
+         *
+         * Sau khi qua ngưỡng tối thiểu, topic được xếp hạng bằng điểm:
+         * score = growthRate * log(1 + totalPapers).
+         * Công thức này giữ trọng tâm là tốc độ tăng trưởng, nhưng cộng thêm
+         * sức nặng vừa phải cho các topic có volume lớn hơn.
          *
          * @param fromYear năm bắt đầu thống kê
          * @param limit    số lượng topic tối đa
-         * @return danh sách topic và tổng số paper
+         * @return danh sách topic, số paper gần đây, growth rate, tổng paper và score
          */
         @Transactional(readOnly = true)
         public List<TopTopicResponse> getTopTrendingTopics(
@@ -105,19 +127,70 @@ public class TrendService {
                 int safeLimit = Math.max(
                                 1,
                                 Math.min(limit, 20));
+                int currentYear = Year.now().getValue();
+                int recentStartYear = fromYear == null
+                                ? currentYear - DEFAULT_TOPIC_TREND_PERIOD_YEARS + 1
+                                : fromYear;
 
-                if (fromYear == null) {
-                        fromYear = Year.now().getValue() - 5;
+                if (recentStartYear > currentYear) {
+                        throw new BadRequestException(
+                                        "fromYear không được lớn hơn năm hiện tại");
                 }
 
+                int periodYears = currentYear - recentStartYear + 1;
+                int previousEndYear = recentStartYear - 1;
+                int previousStartYear = recentStartYear - periodYears;
+                int safeMinPapersThreshold = Math.max(
+                                0,
+                                minPapersThreshold);
+
                 return researchPaperRepository
-                                .getTop5TrendingTopics(
-                                                fromYear,
-                                                PageRequest.of(0, safeLimit))
+                                .getTopicGrowthStats(
+                                                recentStartYear,
+                                                previousStartYear,
+                                                previousEndYear)
                                 .stream()
-                                .map(row -> new TopTopicResponse(
-                                                (String) row[0],
-                                                ((Number) row[1]).longValue()))
+                                .map(this::toTopTopicResponse)
+                                .filter(response -> response.getTotalPapers() >= safeMinPapersThreshold)
+                                .sorted((left, right) -> Double.compare(
+                                                right.getScore(),
+                                                left.getScore()))
+                                .limit(safeLimit)
                                 .toList();
+        }
+
+        private TopTopicResponse toTopTopicResponse(Object[] row) {
+                long recentCount = ((Number) row[1]).longValue();
+                long previousCount = ((Number) row[2]).longValue();
+                long totalPapers = recentCount + previousCount;
+                double growthRate = calculateGrowthRate(
+                                recentCount,
+                                previousCount);
+                double score = calculateTrendScore(
+                                growthRate,
+                                totalPapers);
+
+                return new TopTopicResponse(
+                                (String) row[0],
+                                recentCount,
+                                growthRate,
+                                totalPapers,
+                                score);
+        }
+
+        private double calculateGrowthRate(
+                        long recentCount,
+                        long previousCount) {
+                if (previousCount == 0) {
+                        return recentCount > 0 ? 1.0 : 0.0;
+                }
+
+                return (double) (recentCount - previousCount) / previousCount;
+        }
+
+        private double calculateTrendScore(
+                        double growthRate,
+                        long totalPapers) {
+                return growthRate * Math.log1p(totalPapers);
         }
 }

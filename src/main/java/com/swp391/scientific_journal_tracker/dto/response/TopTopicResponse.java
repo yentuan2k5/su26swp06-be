@@ -10,4 +10,7 @@ import lombok.NoArgsConstructor;
 public class TopTopicResponse {
     private String topic;
     private Long paperCount;
+    private double growthRate;
+    private long totalPapers;
+    private double score;
 }

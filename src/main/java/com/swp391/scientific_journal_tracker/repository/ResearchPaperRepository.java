@@ -238,6 +238,46 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
     List<Object[]> getTrendByField(
             @Param("field") String field);
 
+    /**
+     * Thống kê số paper của từng topic trong hai giai đoạn liên tiếp.
+     *
+     * recentPeriod bắt đầu từ recentStartYear và có cùng độ dài với
+     * previousPeriod. Vì vậy năm kết thúc của recentPeriod được suy ra từ
+     * recentStartYear + previousEndYear - previousStartYear.
+     *
+     * SUM(CASE WHEN ...) giúp mỗi topic chỉ xuất hiện một dòng kết quả,
+     * gồm cả số paper của giai đoạn gần đây và giai đoạn liền trước.
+     *
+     * @param recentStartYear   năm bắt đầu giai đoạn gần đây
+     * @param previousStartYear năm bắt đầu giai đoạn liền trước
+     * @param previousEndYear   năm kết thúc giai đoạn liền trước
+     * @return danh sách Object[] gồm [topicName, recentCount, previousCount]
+     */
+    @Query("""
+            SELECT t.name,
+                   SUM(CASE
+                           WHEN p.year BETWEEN :recentStartYear
+                               AND (:recentStartYear + :previousEndYear - :previousStartYear)
+                           THEN 1
+                           ELSE 0
+                       END),
+                   SUM(CASE
+                           WHEN p.year BETWEEN :previousStartYear AND :previousEndYear
+                           THEN 1
+                           ELSE 0
+                       END)
+            FROM ResearchPaper p
+            JOIN p.researchTopics t
+            WHERE p.year IS NOT NULL
+            AND p.year BETWEEN :previousStartYear
+                AND (:recentStartYear + :previousEndYear - :previousStartYear)
+            GROUP BY t.researchTopicId, t.name
+            """)
+    List<Object[]> getTopicGrowthStats(
+            @Param("recentStartYear") int recentStartYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear);
+
     @Query("""
                 SELECT t.name, COUNT(DISTINCT p)
                 FROM ResearchPaper p
