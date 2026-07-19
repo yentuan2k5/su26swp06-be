@@ -1,0 +1,21 @@
+package com.swp391.scientific_journal_tracker.dto.request;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import lombok.Data;
+
+@Data
+public class BackfillOpenAlexRequest {
+    @NotNull(message = "fromYear không được để trống")
+    @Min(value = 1900, message = "fromYear không hợp lệ")
+    private Integer fromYear;
+
+    @NotNull(message = "toYear không được để trống")
+    @Min(value = 1900, message = "toYear không hợp lệ")
+    private Integer toYear;
+
+    @NotEmpty(message = "fieldIds không được để trống")
+    private List<String> fieldIds;
+}

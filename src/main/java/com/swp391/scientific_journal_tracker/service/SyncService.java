@@ -31,6 +31,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -52,6 +54,7 @@ public class SyncService {
     private final NotificationService notificationService;
     private final AuthorRepository authorRepository;
     private final ApiDataSourceRepository apiDataSourceRepository;
+    private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
 
     @Value("${openalex.sync.field-ids:17}")
     private String openAlexFieldIds;
@@ -69,7 +72,29 @@ public class SyncService {
      * Entry point chính, gọi từ Scheduler hoặc AdminController.
      */
     public SyncLogResponse syncFromOpenAlex() {
+        return runExclusive("sync", this::doSyncFromOpenAlex);
+    }
 
+    private SyncLogResponse runExclusive(
+            String operationName,
+            Supplier<SyncLogResponse> task) {
+        if (!syncInProgress.compareAndSet(false, true)) {
+            log.warn(
+                    "Từ chối {} vì đang có một tác vụ sync/backfill khác chạy.",
+                    operationName);
+
+            throw new IllegalStateException(
+                    "Đang có một lần sync hoặc backfill khác chạy, vui lòng đợi.");
+        }
+
+        try {
+            return task.get();
+        } finally {
+            syncInProgress.set(false);
+        }
+    }
+
+    private SyncLogResponse doSyncFromOpenAlex() {
         /*
          * Ghi lại thời điểm bắt đầu trước khi gọi OpenAlex.
          *
@@ -139,7 +164,8 @@ public class SyncService {
                     try {
                         boolean isNewPaper = processOpenAlexWork(
                                 paperData,
-                                openAlexSource);
+                                openAlexSource,
+                                true);
 
                         if (isNewPaper) {
                             totalSynced++;
@@ -237,6 +263,15 @@ public class SyncService {
             int fromYear,
             int toYear,
             List<String> fieldIds) {
+        return runExclusive(
+                "backfill",
+                () -> doBackfillFromOpenAlex(fromYear, toYear, fieldIds));
+    }
+
+    private SyncLogResponse doBackfillFromOpenAlex(
+            int fromYear,
+            int toYear,
+            List<String> fieldIds) {
         if (fromYear > toYear) {
             throw new IllegalArgumentException(
                     "fromYear không được lớn hơn toYear");
@@ -303,7 +338,8 @@ public class SyncService {
                     try {
                         boolean isNewPaper = processOpenAlexWork(
                                 paperData,
-                                openAlexSource);
+                                openAlexSource,
+                                false);
 
                         if (isNewPaper) {
                             totalSynced++;
@@ -495,7 +531,10 @@ public class SyncService {
                 });
     }
 
-    private boolean processOpenAlexWork(Map<String, Object> workData, ApiDataSource apiDataSource) {
+    private boolean processOpenAlexWork(
+            Map<String, Object> workData,
+            ApiDataSource apiDataSource,
+            boolean sendNotification) {
         String externalId = getString(workData, "id");
         if (externalId == null) {
             return false;
@@ -558,7 +597,7 @@ public class SyncService {
 
         ResearchPaper savedPaper = paperRepository.save(paper);
 
-        if (isNewPaper) {
+        if (isNewPaper && sendNotification) {
             notificationService.createNewPaperNotifications(savedPaper.getResearchPaperId());
         }
 
