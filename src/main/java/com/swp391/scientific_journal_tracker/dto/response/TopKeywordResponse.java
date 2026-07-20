@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TopTopicResponse {
-    private String topic;
+public class TopKeywordResponse {
+    private String keyword;
     private Long paperCount;
     private double growthRate;
     private long totalPapers;

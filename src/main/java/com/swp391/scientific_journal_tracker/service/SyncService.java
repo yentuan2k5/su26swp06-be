@@ -263,15 +263,32 @@ public class SyncService {
             int fromYear,
             int toYear,
             List<String> fieldIds) {
+        return backfillFromOpenAlex(
+                fromYear,
+                toYear,
+                fieldIds,
+                null);
+    }
+
+    public SyncLogResponse backfillFromOpenAlex(
+            int fromYear,
+            int toYear,
+            List<String> fieldIds,
+            Integer maxResultsOverride) {
         return runExclusive(
                 "backfill",
-                () -> doBackfillFromOpenAlex(fromYear, toYear, fieldIds));
+                () -> doBackfillFromOpenAlex(
+                        fromYear,
+                        toYear,
+                        fieldIds,
+                        maxResultsOverride));
     }
 
     private SyncLogResponse doBackfillFromOpenAlex(
             int fromYear,
             int toYear,
-            List<String> fieldIds) {
+            List<String> fieldIds,
+            Integer maxResultsOverride) {
         if (fromYear > toYear) {
             throw new IllegalArgumentException(
                     "fromYear không được lớn hơn toYear");
@@ -284,9 +301,7 @@ public class SyncService {
                     "Danh sách fieldIds không được để trống");
         }
 
-        int safeMaxResultsPerConcept = Math.max(
-                1,
-                maxResultsPerConcept);
+        int safeMaxResultsPerConcept = resolveBackfillMaxResults(maxResultsOverride);
 
         LocalDateTime backfillStartedAt = LocalDateTime.now();
 
@@ -407,6 +422,20 @@ public class SyncService {
 
             return SyncLogResponse.from(savedLog);
         }
+    }
+
+    private int resolveBackfillMaxResults(Integer maxResultsOverride) {
+        int configuredMaxResults = Math.max(
+                1,
+                maxResultsPerConcept);
+
+        if (maxResultsOverride == null) {
+            return configuredMaxResults;
+        }
+
+        return Math.max(
+                1,
+                Math.min(maxResultsOverride, configuredMaxResults));
     }
 
     private List<String> normalizeOpenAlexFieldIds(List<String> fieldIds) {

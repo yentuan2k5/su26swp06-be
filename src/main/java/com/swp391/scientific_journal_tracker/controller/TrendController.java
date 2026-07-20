@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.swp391.scientific_journal_tracker.dto.response.TopKeywordResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
 import com.swp391.scientific_journal_tracker.service.TrendService;
@@ -18,7 +19,7 @@ import lombok.RequiredArgsConstructor;
  * Controller cung cấp các API phân tích xu hướng bài báo khoa học.
  *
  * Hỗ trợ phân tích theo keyword, topic, lĩnh vực journal
- * và lấy danh sách topic phổ biến.
+ * và lấy danh sách topic/keyword đang tăng trưởng.
  */
 @RestController
 @RequestMapping("/api/trends")
@@ -91,6 +92,24 @@ public class TrendController {
             @RequestParam(defaultValue = "5") int limit) {
         return ResponseEntity.ok(
                 trendService.getTopTrendingTopics(
+                        fromYear,
+                        limit));
+    }
+
+    /**
+     * Trả về những keyword đang tăng trưởng mạnh
+     * trong khoảng thời gian được chọn.
+     *
+     * @param fromYear năm bắt đầu thống kê, có thể để trống
+     * @param limit    số lượng keyword tối đa
+     * @return danh sách keyword đang tăng trưởng
+     */
+    @GetMapping("/top-keywords")
+    public ResponseEntity<List<TopKeywordResponse>> getTopTrendingKeywords(
+            @RequestParam(required = false) Integer fromYear,
+            @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(
+                trendService.getTopTrendingKeywords(
                         fromYear,
                         limit));
     }

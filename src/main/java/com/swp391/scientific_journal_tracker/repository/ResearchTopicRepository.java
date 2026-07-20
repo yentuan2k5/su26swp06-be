@@ -44,5 +44,5 @@ public interface ResearchTopicRepository extends JpaRepository<ResearchTopic, Lo
             GROUP BY t.researchTopicId, t.name, t.description
             ORDER BY COUNT(DISTINCT p) DESC
             """)
-    List<Object[]> findTrendingTopics(Pageable pageable);
+    List<Object[]> findPopularTopics(Pageable pageable);
 }

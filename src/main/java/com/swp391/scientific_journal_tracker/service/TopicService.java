@@ -79,12 +79,18 @@ public class TopicService {
                                 .map(PaperResponse::fromEntity);
         }
 
+        /**
+         * Lấy các topic phổ biến theo tổng số paper.
+         *
+         * Đây là danh sách "popular topics", khác với "trending topics"
+         * trong TrendService vốn được xếp hạng bằng growth rate + volume.
+         */
         @Transactional(readOnly = true)
-        public List<TopicResponse> getTrendingTopics(int limit) {
+        public List<TopicResponse> getPopularTopics(int limit) {
                 int safeLimit = Math.max(1, Math.min(limit, 20));
 
                 return researchTopicRepository
-                                .findTrendingTopics(PageRequest.of(0, safeLimit))
+                                .findPopularTopics(PageRequest.of(0, safeLimit))
                                 .stream()
                                 .map(row -> new TopicResponse(
                                                 ((Number) row[0]).longValue(),

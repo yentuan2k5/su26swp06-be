@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopicResponse;
+import com.swp391.scientific_journal_tracker.service.TrendService;
 import com.swp391.scientific_journal_tracker.service.TopicService;
 
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class TopicController {
 
     private final TopicService topicService;
+    private final TrendService trendService;
 
     @GetMapping
     public List<TopicResponse> getAllTopics() {
@@ -37,9 +40,16 @@ public class TopicController {
     }
 
     @GetMapping("/trending")
-    public List<TopicResponse> getTrendingTopics(
+    public List<TopTopicResponse> getTrendingTopics(
+            @RequestParam(required = false) Integer fromYear,
             @RequestParam(defaultValue = "10") int limit) {
-        return topicService.getTrendingTopics(limit);
+        return trendService.getTopTrendingTopics(fromYear, limit);
+    }
+
+    @GetMapping("/popular")
+    public List<TopicResponse> getPopularTopics(
+            @RequestParam(defaultValue = "10") int limit) {
+        return topicService.getPopularTopics(limit);
     }
 
     @GetMapping("/following")

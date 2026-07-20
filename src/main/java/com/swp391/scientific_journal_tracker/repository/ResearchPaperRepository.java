@@ -278,6 +278,45 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             @Param("previousStartYear") int previousStartYear,
             @Param("previousEndYear") int previousEndYear);
 
+    /**
+     * Thống kê số paper của từng keyword trong hai giai đoạn liên tiếp.
+     *
+     * Query này dùng cùng nguyên tắc với topic growth stats để phục vụ
+     * bảng top trending keywords. Mỗi keyword chỉ xuất hiện một dòng,
+     * gồm số paper của giai đoạn gần đây và giai đoạn liền trước.
+     *
+     * @param recentStartYear   năm bắt đầu giai đoạn gần đây
+     * @param previousStartYear năm bắt đầu giai đoạn liền trước
+     * @param previousEndYear   năm kết thúc giai đoạn liền trước
+     * @return danh sách Object[] gồm [keywordTerm, recentCount, previousCount]
+     */
+    @Query("""
+            SELECT k.term,
+                   SUM(CASE
+                           WHEN p.year BETWEEN :recentStartYear
+                               AND (:recentStartYear + :previousEndYear - :previousStartYear)
+                           THEN 1
+                           ELSE 0
+                       END),
+                   SUM(CASE
+                           WHEN p.year BETWEEN :previousStartYear AND :previousEndYear
+                           THEN 1
+                           ELSE 0
+                       END)
+            FROM ResearchPaper p
+            JOIN p.keywords k
+            WHERE p.year IS NOT NULL
+            AND k.term IS NOT NULL
+            AND TRIM(k.term) <> ''
+            AND p.year BETWEEN :previousStartYear
+                AND (:recentStartYear + :previousEndYear - :previousStartYear)
+            GROUP BY k.keywordId, k.term
+            """)
+    List<Object[]> getKeywordGrowthStats(
+            @Param("recentStartYear") int recentStartYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear);
+
     @Query("""
                 SELECT t.name, COUNT(DISTINCT p)
                 FROM ResearchPaper p

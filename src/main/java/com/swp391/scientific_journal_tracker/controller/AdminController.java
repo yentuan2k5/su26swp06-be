@@ -2,10 +2,12 @@ package com.swp391.scientific_journal_tracker.controller;
 
 import com.swp391.scientific_journal_tracker.dto.request.BackfillOpenAlexRequest;
 import com.swp391.scientific_journal_tracker.dto.request.UpdateUserRoleRequest;
+import com.swp391.scientific_journal_tracker.dto.response.SystemConfigResponse;
 import com.swp391.scientific_journal_tracker.dto.response.SyncLogResponse;
 import com.swp391.scientific_journal_tracker.repository.SyncLogRepository;
 import com.swp391.scientific_journal_tracker.service.DashboardReportService;
 import com.swp391.scientific_journal_tracker.service.SyncService;
+import com.swp391.scientific_journal_tracker.service.SystemConfigService;
 import com.swp391.scientific_journal_tracker.service.UserService;
 import com.swp391.scientific_journal_tracker.dto.response.DashboardReportResponse;
 import com.swp391.scientific_journal_tracker.dto.response.UserResponse;
@@ -30,6 +32,7 @@ public class AdminController {
     private final DashboardReportService dashboardReportService;
     private final UserService userService;
     private final SyncService syncService;
+    private final SystemConfigService systemConfigService;
     private final SyncLogRepository syncLogRepository;
 
     /**
@@ -56,7 +59,8 @@ public class AdminController {
             return ResponseEntity.ok(syncService.backfillFromOpenAlex(
                     request.getFromYear(),
                     request.getToYear(),
-                    request.getFieldIds()));
+                    request.getFieldIds(),
+                    request.getMaxResults()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -87,6 +91,15 @@ public class AdminController {
                 .map(SyncLogResponse::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * GET /api/admin/system/config
+     * Xem cấu hình nguồn dữ liệu và trend hiện tại của hệ thống.
+     */
+    @GetMapping("/system/config")
+    public ResponseEntity<SystemConfigResponse> getSystemConfig() {
+        return ResponseEntity.ok(systemConfigService.getSystemConfig());
     }
 
     @GetMapping("/users")
