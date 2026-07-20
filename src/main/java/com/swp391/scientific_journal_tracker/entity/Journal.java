@@ -7,6 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -17,7 +18,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "Journals")
+@Table(name = "Journals", indexes = {
+        @Index(name = "idx_journal_title", columnList = "Title"),
+        @Index(name = "idx_journal_field", columnList = "Field")
+})
 @AllArgsConstructor
 @Getter
 @Setter

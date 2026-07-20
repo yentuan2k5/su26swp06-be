@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
@@ -22,7 +23,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "ResearchPapers") // Table name in plural form
+@Table(name = "ResearchPapers", indexes = {
+        @Index(name = "idx_research_paper_year", columnList = "Year"),
+        @Index(name = "idx_research_paper_source_api", columnList = "SourceApi"),
+        @Index(name = "idx_research_paper_journal", columnList = "JournalId"),
+        @Index(name = "idx_research_paper_api_data_source", columnList = "ApiDataSourceId"),
+        @Index(name = "idx_research_paper_doi", columnList = "Doi")
+}) // Table name in plural form
 @AllArgsConstructor // Constructor with all fields
 @NoArgsConstructor // Default constructor
 @Getter
@@ -50,7 +57,14 @@ public class ResearchPaper {
     private String authorsRaw;
 
     @ManyToMany
-    @JoinTable(name = "paper_authors", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "AuthorId"))
+    @JoinTable(
+            name = "paper_authors",
+            joinColumns = @JoinColumn(name = "ResearchPaperId"),
+            inverseJoinColumns = @JoinColumn(name = "AuthorId"),
+            indexes = {
+                    @Index(name = "idx_paper_authors_paper", columnList = "ResearchPaperId"),
+                    @Index(name = "idx_paper_authors_author", columnList = "AuthorId")
+            })
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<Author> authors = new ArrayList<>();
@@ -67,12 +81,26 @@ public class ResearchPaper {
     @EqualsAndHashCode.Exclude
     private ApiDataSource apiDataSource;
     @ManyToMany
-    @JoinTable(name = "paper_keywords", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "KeywordId"))
+    @JoinTable(
+            name = "paper_keywords",
+            joinColumns = @JoinColumn(name = "ResearchPaperId"),
+            inverseJoinColumns = @JoinColumn(name = "KeywordId"),
+            indexes = {
+                    @Index(name = "idx_paper_keywords_paper", columnList = "ResearchPaperId"),
+                    @Index(name = "idx_paper_keywords_keyword", columnList = "KeywordId")
+            })
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<Keyword> keywords = new ArrayList<>();
     @ManyToMany
-    @JoinTable(name = "paper_topics", joinColumns = @JoinColumn(name = "ResearchPaperId"), inverseJoinColumns = @JoinColumn(name = "ResearchTopicId"))
+    @JoinTable(
+            name = "paper_topics",
+            joinColumns = @JoinColumn(name = "ResearchPaperId"),
+            inverseJoinColumns = @JoinColumn(name = "ResearchTopicId"),
+            indexes = {
+                    @Index(name = "idx_paper_topics_paper", columnList = "ResearchPaperId"),
+                    @Index(name = "idx_paper_topics_topic", columnList = "ResearchTopicId")
+            })
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<ResearchTopic> researchTopics = new ArrayList<>();
