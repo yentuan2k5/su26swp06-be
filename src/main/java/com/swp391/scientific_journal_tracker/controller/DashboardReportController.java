@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
-@PreAuthorize("isAuthenticated()")
+@PreAuthorize("hasAnyRole('LECTURER', 'RESEARCHER', 'ADMIN')")
 public class DashboardReportController {
 
     private final DashboardReportService dashboardReportService;

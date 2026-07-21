@@ -16,8 +16,15 @@ public class DashboardReportResponse {
     private String content;
     private LocalDateTime generatedAt;
     private UserResponse user;
+    private DashboardReportChartsResponse charts;
 
     public static DashboardReportResponse fromEntity(DashboardReport report) {
+        return fromEntity(report, null);
+    }
+
+    public static DashboardReportResponse fromEntity(
+            DashboardReport report,
+            DashboardReportChartsResponse charts) {
         UserResponse userResponse = null;
 
         if (report.getUser() != null) {
@@ -34,6 +41,7 @@ public class DashboardReportResponse {
                 report.getTitle(),
                 report.getContent(),
                 report.getGeneratedAt(),
-                userResponse);
+                userResponse,
+                charts);
     }
 }

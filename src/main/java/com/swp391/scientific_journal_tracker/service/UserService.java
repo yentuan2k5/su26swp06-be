@@ -50,6 +50,12 @@ public class UserService {
         User user = findUser(userId);
         User.Role newRole = parseRole(role);
 
+        if (user.getRole() == User.Role.ADMIN
+                && newRole != User.Role.ADMIN
+                && userRepository.findByRole(User.Role.ADMIN).size() <= 1) {
+            throw new BadRequestException("Không thể đổi role của admin cuối cùng trong hệ thống");
+        }
+
         user.setRole(newRole);
         return toUserResponse(userRepository.save(user));
     }
