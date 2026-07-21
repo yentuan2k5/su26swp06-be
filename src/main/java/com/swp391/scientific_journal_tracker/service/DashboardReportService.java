@@ -29,13 +29,17 @@ public class DashboardReportService {
     public DashboardReportResponse generateReport(GenerateReportRequest request, Authentication authentication) {
         User user = getCurrentUser(authentication);
         DashboardSummaryResponse summary = dashboardService.getSummary();
+        DashboardReportChartsResponse charts = buildReportCharts(
+                normalize(request.getKeyword()),
+                normalize(request.getTopic()),
+                summary);
 
         String title = normalize(request.getTitle());
         if (title == null) {
             title = "Scientific Journal Analytical Report";
         }
 
-        String content = buildReportContent(request, summary);
+        String content = buildReportContent(request, summary, charts);
 
         DashboardReport report = new DashboardReport();
         report.setTitle(title);
@@ -43,7 +47,9 @@ public class DashboardReportService {
         report.setGeneratedAt(LocalDateTime.now());
         report.setUser(user);
 
-        return DashboardReportResponse.fromEntity(dashboardReportRepository.save(report));
+        return DashboardReportResponse.fromEntity(
+                dashboardReportRepository.save(report),
+                charts);
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +68,9 @@ public class DashboardReportService {
         DashboardReport report = findReport(reportId);
         checkOwner(report, user);
 
-        return DashboardReportResponse.fromEntity(report);
+        return DashboardReportResponse.fromEntity(
+                report,
+                buildReportChartsFromContent(report.getContent()));
     }
 
     @Transactional(readOnly = true)
@@ -98,7 +106,10 @@ public class DashboardReportService {
                 .toList();
     }
 
-    private String buildReportContent(GenerateReportRequest request, DashboardSummaryResponse summary) {
+    private String buildReportContent(
+            GenerateReportRequest request,
+            DashboardSummaryResponse summary,
+            DashboardReportChartsResponse charts) {
         StringBuilder content = new StringBuilder();
 
         content.append("SCIENTIFIC JOURNAL PUBLICATION TREND REPORT\n");
@@ -119,17 +130,17 @@ public class DashboardReportService {
         String keyword = normalize(request.getKeyword());
         if (keyword != null) {
             content.append("5. Keyword trend: ").append(keyword).append("\n");
-            appendTrend(content, trendService.getTrendByKeyword(keyword));
+            appendTrend(content, charts.getKeywordTrend());
         }
 
         String topic = normalize(request.getTopic());
         if (topic != null) {
             content.append("6. Topic trend: ").append(topic).append("\n");
-            appendTrend(content, trendService.getTrendByTopic(topic));
+            appendTrend(content, charts.getTopicTrend());
         }
 
         content.append("7. Top trending topics\n");
-        List<TopTopicResponse> topTopics = trendService.getTopTrendingTopics(null, 5);
+        List<TopTopicResponse> topTopics = charts.getTopTrendingTopics();
 
         if (topTopics.isEmpty()) {
             content.append("- No trending topic data available.\n");
@@ -141,6 +152,41 @@ public class DashboardReportService {
         }
 
         return content.toString();
+    }
+
+    private DashboardReportChartsResponse buildReportChartsFromContent(String content) {
+        return buildReportCharts(
+                extractReportFilter(content, "Keyword trend: "),
+                extractReportFilter(content, "Topic trend: "),
+                dashboardService.getSummary());
+    }
+
+    private DashboardReportChartsResponse buildReportCharts(
+            String keyword,
+            String topic,
+            DashboardSummaryResponse summary) {
+        return new DashboardReportChartsResponse(
+                summary.getPapersByYear(),
+                summary.getTopKeywords(),
+                summary.getTopJournals(),
+                keyword == null ? List.of() : trendService.getTrendByKeyword(keyword),
+                topic == null ? List.of() : trendService.getTrendByTopic(topic),
+                trendService.getTopTrendingTopics(null, 5));
+    }
+
+    private String extractReportFilter(String content, String marker) {
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+
+        for (String line : content.split("\\R")) {
+            int markerIndex = line.indexOf(marker);
+            if (markerIndex >= 0) {
+                return normalize(line.substring(markerIndex + marker.length()));
+            }
+        }
+
+        return null;
     }
 
     private void appendChart(StringBuilder content, String title, List<DashboardChartItemResponse> items) {
