@@ -297,8 +297,7 @@ public class SyncService {
         List<String> safeFieldIds = normalizeOpenAlexFieldIds(fieldIds);
 
         if (safeFieldIds.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Danh sách fieldIds không được để trống");
+            safeFieldIds = getConfiguredFieldIds();
         }
 
         int safeMaxResultsPerConcept = resolveBackfillMaxResults(maxResultsOverride);
