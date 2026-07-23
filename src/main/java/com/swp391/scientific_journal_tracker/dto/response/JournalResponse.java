@@ -20,13 +20,21 @@ public class JournalResponse {
     private Long followerCount;
 
     public static JournalResponse fromEntity(Journal journal) {
+        /*
+         * Không gọi journal.getResearchPapers().size() hoặc
+         * journal.getFollowers().size() ở đây.
+         *
+         * Hai collection này là lazy collection; khi database lớn,
+         * .size() có thể khiến Hibernate tải rất nhiều entity vào RAM.
+         * Những API cần số lượng sẽ dùng query COUNT riêng trong service.
+         */
         return new JournalResponse(
                 journal.getJournalId(),
                 journal.getTitle(),
                 journal.getIssn(),
                 journal.getPublisher(),
                 journal.getField(),
-                journal.getResearchPapers() != null ? (long) journal.getResearchPapers().size() : 0L,
-                journal.getFollowers() != null ? (long) journal.getFollowers().size() : 0L);
+                0L,
+                0L);
     }
 }

@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @Slf4j
 @Component
@@ -170,17 +171,43 @@ public class OpenAlexClient {
          * Method này dùng cho backfill dữ liệu lịch sử theo topic / năm xuất bản,
          * tách riêng khỏi searchWorks() đang phục vụ incremental sync.
          */
-        @SuppressWarnings("unchecked")
         public List<Map<String, Object>> fetchWorksByFilter(
                         String filter,
                         int maxResults) {
+                List<Map<String, Object>> works = new ArrayList<>();
+
+                fetchWorksByFilterInPages(
+                                filter,
+                                maxResults,
+                                works::addAll);
+
+                return works;
+        }
+
+        /**
+         * Lấy works bằng OpenAlex filter API theo từng page.
+         *
+         * Backfill nhiều dữ liệu nên không gom toàn bộ response vào một List lớn.
+         * Mỗi page tối đa 100 work sẽ được đưa sang pageConsumer để xử lý ngay,
+         * giúp giảm lượng JSON và entity bị giữ trong RAM.
+         */
+        @SuppressWarnings("unchecked")
+        public int fetchWorksByFilterInPages(
+                        String filter,
+                        int maxResults,
+                        Consumer<List<Map<String, Object>>> pageConsumer) {
                 if (filter == null || filter.isBlank()) {
                         throw new IllegalArgumentException(
                                         "OpenAlex filter không được để trống");
                 }
 
                 if (maxResults <= 0) {
-                        return List.of();
+                        return 0;
+                }
+
+                if (pageConsumer == null) {
+                        throw new IllegalArgumentException(
+                                        "OpenAlex pageConsumer không được để null");
                 }
 
                 if (openAlexApiKey == null || openAlexApiKey.isBlank()) {
@@ -190,12 +217,12 @@ public class OpenAlexClient {
                 }
 
                 String safeFilter = filter.trim();
-                List<Map<String, Object>> works = new ArrayList<>();
+                int totalFetched = 0;
                 String cursor = "*";
 
                 while (cursor != null
                                 && !cursor.isBlank()
-                                && works.size() < maxResults) {
+                                && totalFetched < maxResults) {
 
                         ResponseEntity<Map<String, Object>> responseEntity = requestWorksByFilterPage(
                                         safeFilter,
@@ -224,7 +251,7 @@ public class OpenAlexClient {
                                                 "Dừng fetch OpenAlex sớm vì remaining USD thấp. "
                                                                 + "filter={}, fetched={}",
                                                 safeFilter,
-                                                works.size());
+                                                totalFetched);
 
                                 break;
                         }
@@ -241,13 +268,18 @@ public class OpenAlexClient {
                                 break;
                         }
 
-                        int remainingSlots = maxResults - works.size();
+                        int remainingSlots = maxResults - totalFetched;
 
-                        results.stream()
+                        List<Map<String, Object>> pageWorks = results.stream()
                                         .filter(item -> item instanceof Map<?, ?>)
                                         .limit(remainingSlots)
                                         .map(item -> (Map<String, Object>) item)
-                                        .forEach(works::add);
+                                        .toList();
+
+                        if (!pageWorks.isEmpty()) {
+                                pageConsumer.accept(pageWorks);
+                                totalFetched += pageWorks.size();
+                        }
 
                         cursor = extractNextCursor(response);
 
@@ -255,12 +287,12 @@ public class OpenAlexClient {
                                         "OpenAlex filter='{}', fetched={}, "
                                                         + "lastPageReturned={}, nextCursorExists={}",
                                         safeFilter,
-                                        works.size(),
+                                        totalFetched,
                                         results.size(),
                                         cursor != null && !cursor.isBlank());
                 }
 
-                return works;
+                return totalFetched;
         }
 
         private ResponseEntity<Map<String, Object>> requestWorksByFilterPage(

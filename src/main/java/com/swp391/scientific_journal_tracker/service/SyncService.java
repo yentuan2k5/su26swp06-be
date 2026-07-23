@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -320,8 +321,8 @@ public class SyncService {
         syncLog.setPaperSynced(0);
         syncLog = syncLogRepository.save(syncLog);
 
-        int totalSynced = 0;
-        int totalFailed = 0;
+        AtomicInteger totalSynced = new AtomicInteger(0);
+        AtomicInteger totalFailed = new AtomicInteger(0);
 
         try {
             ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
@@ -337,56 +338,57 @@ public class SyncService {
                         fieldId,
                         filter);
 
-                List<Map<String, Object>> papers = openAlexClient.fetchWorksByFilter(
+                int fetchedForField = openAlexClient.fetchWorksByFilterInPages(
                         filter,
-                        safeMaxResultsPerConcept);
+                        safeMaxResultsPerConcept,
+                        papers -> {
+                            for (Map<String, Object> paperData : papers) {
+                                try {
+                                    boolean isNewPaper = processOpenAlexWork(
+                                            paperData,
+                                            openAlexSource,
+                                            false);
 
-                if (papers.isEmpty()) {
+                                    if (isNewPaper) {
+                                        totalSynced.incrementAndGet();
+                                    }
+
+                                } catch (Exception exception) {
+                                    totalFailed.incrementAndGet();
+
+                                    log.warn(
+                                            "Bỏ qua paper backfill do lỗi. "
+                                                    + "source={}, fieldId={}, externalId={}, "
+                                                    + "title={}, error={}",
+                                            SOURCE_OPENALEX_BACKFILL,
+                                            fieldId,
+                                            getString(paperData, "id"),
+                                            getPaperLogTitle(paperData),
+                                            exception.getMessage(),
+                                            exception);
+                                }
+                            }
+                        });
+
+                if (fetchedForField == 0) {
                     log.warn(
                             "OpenAlex không trả paper nào khi backfill. "
                                     + "fieldId={}, filter={}",
                             fieldId,
                             filter);
                 }
-
-                for (Map<String, Object> paperData : papers) {
-                    try {
-                        boolean isNewPaper = processOpenAlexWork(
-                                paperData,
-                                openAlexSource,
-                                false);
-
-                        if (isNewPaper) {
-                            totalSynced++;
-                        }
-
-                    } catch (Exception exception) {
-                        totalFailed++;
-
-                        log.warn(
-                                "Bỏ qua paper backfill do lỗi. "
-                                        + "source={}, fieldId={}, externalId={}, "
-                                        + "title={}, error={}",
-                                SOURCE_OPENALEX_BACKFILL,
-                                fieldId,
-                                getString(paperData, "id"),
-                                getPaperLogTitle(paperData),
-                                exception.getMessage(),
-                                exception);
-                    }
-                }
             }
 
             syncLog.setStatus(
-                    totalSynced == 0 && totalFailed > 0
+                    totalSynced.get() == 0 && totalFailed.get() > 0
                             ? Status.FAILED
                             : Status.SUCCESS);
 
-            syncLog.setPaperSynced(totalSynced);
+            syncLog.setPaperSynced(totalSynced.get());
 
-            if (totalFailed > 0) {
+            if (totalFailed.get() > 0) {
                 syncLog.setErrorMessage(
-                        "Có " + totalFailed
+                        "Có " + totalFailed.get()
                                 + " paper backfill bị bỏ qua do lỗi. "
                                 + "Xem backend log để biết chi tiết.");
             } else {
@@ -399,8 +401,8 @@ public class SyncService {
             log.info(
                     "=== Backfill OpenAlex hoàn tất: "
                             + "{} paper mới, {} paper lỗi ===",
-                    totalSynced,
-                    totalFailed);
+                    totalSynced.get(),
+                    totalFailed.get());
 
             return SyncLogResponse.from(savedLog);
 
@@ -411,7 +413,7 @@ public class SyncService {
                     exception);
 
             syncLog.setStatus(Status.FAILED);
-            syncLog.setPaperSynced(totalSynced);
+            syncLog.setPaperSynced(totalSynced.get());
             syncLog.setErrorMessage(
                     exception.getMessage() == null
                             ? "Không xác định được lỗi backfill"

@@ -49,6 +49,80 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
             LEFT JOIN j.researchPapers p
             LEFT JOIN j.followers f
             GROUP BY j.journalId, j.title, j.issn, j.publisher, j.field
+            ORDER BY j.title ASC
+            """)
+    List<Object[]> findAllJournalSummaries();
+
+    @Query("""
+            SELECT
+                j.journalId,
+                j.title,
+                j.issn,
+                j.publisher,
+                j.field,
+                COUNT(DISTINCT p),
+                COUNT(DISTINCT f)
+            FROM Journal j
+            LEFT JOIN j.researchPapers p
+            LEFT JOIN j.followers f
+            WHERE LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(j.issn, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(j.publisher, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(j.field, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            GROUP BY j.journalId, j.title, j.issn, j.publisher, j.field
+            ORDER BY j.title ASC
+            """)
+    List<Object[]> searchJournalSummaries(@Param("keyword") String keyword);
+
+    @Query("""
+            SELECT
+                j.journalId,
+                j.title,
+                j.issn,
+                j.publisher,
+                j.field,
+                COUNT(DISTINCT p),
+                COUNT(DISTINCT f)
+            FROM Journal j
+            LEFT JOIN j.researchPapers p
+            LEFT JOIN j.followers f
+            WHERE j.journalId = :journalId
+            GROUP BY j.journalId, j.title, j.issn, j.publisher, j.field
+            """)
+    Optional<Object[]> findJournalSummaryById(@Param("journalId") Long journalId);
+
+    @Query("""
+            SELECT
+                j.journalId,
+                j.title,
+                j.issn,
+                j.publisher,
+                j.field,
+                COUNT(DISTINCT p),
+                COUNT(DISTINCT f)
+            FROM Journal j
+            JOIN j.followers u
+            LEFT JOIN j.researchPapers p
+            LEFT JOIN j.followers f
+            WHERE u.userId = :userId
+            GROUP BY j.journalId, j.title, j.issn, j.publisher, j.field
+            ORDER BY j.title ASC
+            """)
+    List<Object[]> findFollowingJournalSummaries(@Param("userId") Long userId);
+
+    @Query("""
+            SELECT
+                j.journalId,
+                j.title,
+                j.issn,
+                j.publisher,
+                j.field,
+                COUNT(DISTINCT p),
+                COUNT(DISTINCT f)
+            FROM Journal j
+            LEFT JOIN j.researchPapers p
+            LEFT JOIN j.followers f
+            GROUP BY j.journalId, j.title, j.issn, j.publisher, j.field
             ORDER BY COUNT(DISTINCT p) DESC
             """)
     List<Object[]> findTopJournals(Pageable pageable);

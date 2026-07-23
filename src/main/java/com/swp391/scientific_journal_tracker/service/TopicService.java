@@ -32,9 +32,9 @@ public class TopicService {
 
         @Transactional(readOnly = true)
         public List<TopicResponse> getAllTopics() {
-                return researchTopicRepository.findAll(Sort.by("name").ascending())
+                return researchTopicRepository.findAllTopicSummaries()
                                 .stream()
-                                .map(TopicResponse::fromEntity)
+                                .map(this::toTopicResponse)
                                 .toList();
         }
 
@@ -44,16 +44,18 @@ public class TopicService {
                         return getAllTopics();
                 }
 
-                return researchTopicRepository.searchTopics(keyword.trim())
+                return researchTopicRepository.searchTopicSummaries(keyword.trim())
                                 .stream()
-                                .map(TopicResponse::fromEntity)
+                                .map(this::toTopicResponse)
                                 .toList();
         }
 
         @Transactional(readOnly = true)
         public TopicResponse getTopicDetail(Long topicId) {
-                ResearchTopic topic = getTopicById(topicId);
-                return TopicResponse.fromEntity(topic);
+                return researchTopicRepository.findTopicSummaryById(topicId)
+                                .map(this::toTopicResponse)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Topic not found with id: " + topicId));
         }
 
         @Transactional(readOnly = true)
@@ -92,12 +94,7 @@ public class TopicService {
                 return researchTopicRepository
                                 .findPopularTopics(PageRequest.of(0, safeLimit))
                                 .stream()
-                                .map(row -> new TopicResponse(
-                                                ((Number) row[0]).longValue(),
-                                                (String) row[1],
-                                                (String) row[2],
-                                                ((Number) row[3]).longValue(),
-                                                ((Number) row[4]).longValue()))
+                                .map(this::toTopicResponse)
                                 .toList();
         }
 
@@ -148,7 +145,7 @@ public class TopicService {
 
                 userRepository.save(user);
 
-                return TopicResponse.fromEntity(topic);
+                return getTopicDetail(topicId);
         }
 
         @Transactional
@@ -168,16 +165,16 @@ public class TopicService {
 
                 userRepository.save(user);
 
-                return TopicResponse.fromEntity(topic);
+                return getTopicDetail(topicId);
         }
 
         @Transactional(readOnly = true)
         public List<TopicResponse> getMyFollowingTopics(Authentication authentication) {
                 User user = getCurrentUser(authentication);
 
-                return user.getFollowingTopics()
+                return researchTopicRepository.findFollowingTopicSummaries(user.getUserId())
                                 .stream()
-                                .map(TopicResponse::fromEntity)
+                                .map(this::toTopicResponse)
                                 .toList();
         }
 
@@ -205,5 +202,14 @@ public class TopicService {
                 return researchTopicRepository.findById(topicId)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Topic not found with id: " + topicId));
+        }
+
+        private TopicResponse toTopicResponse(Object[] row) {
+                return new TopicResponse(
+                                ((Number) row[0]).longValue(),
+                                (String) row[1],
+                                (String) row[2],
+                                ((Number) row[3]).longValue(),
+                                ((Number) row[4]).longValue());
         }
 }

@@ -31,9 +31,9 @@ public class JournalService {
 
     @Transactional(readOnly = true)
     public List<JournalResponse> getAllJournals() {
-        return journalRepository.findAll(Sort.by("title").ascending())
+        return journalRepository.findAllJournalSummaries()
                 .stream()
-                .map(JournalResponse::fromEntity)
+                .map(this::toJournalResponse)
                 .toList();
     }
 
@@ -43,9 +43,9 @@ public class JournalService {
             return getAllJournals();
         }
 
-        return journalRepository.searchJournals(keyword.trim())
+        return journalRepository.searchJournalSummaries(keyword.trim())
                 .stream()
-                .map(JournalResponse::fromEntity)
+                .map(this::toJournalResponse)
                 .toList();
     }
 
@@ -55,21 +55,16 @@ public class JournalService {
 
         return journalRepository.findTopJournals(PageRequest.of(0, safeLimit))
                 .stream()
-                .map(row -> new JournalResponse(
-                        ((Number) row[0]).longValue(),
-                        (String) row[1],
-                        (String) row[2],
-                        (String) row[3],
-                        (String) row[4],
-                        ((Number) row[5]).longValue(),
-                        ((Number) row[6]).longValue()))
+                .map(this::toJournalResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public JournalResponse getJournalDetail(Long journalId) {
-        Journal journal = getJournalById(journalId);
-        return JournalResponse.fromEntity(journal);
+        return journalRepository.findJournalSummaryById(journalId)
+                .map(this::toJournalResponse)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Journal not found with id: " + journalId));
     }
 
     @Transactional(readOnly = true)
@@ -108,7 +103,7 @@ public class JournalService {
 
         userRepository.save(user);
 
-        return JournalResponse.fromEntity(journal);
+        return getJournalDetail(journalId);
     }
 
     @Transactional
@@ -128,16 +123,16 @@ public class JournalService {
 
         userRepository.save(user);
 
-        return JournalResponse.fromEntity(journal);
+        return getJournalDetail(journalId);
     }
 
     @Transactional(readOnly = true)
     public List<JournalResponse> getMyFollowingJournals(Authentication authentication) {
         User user = getCurrentUser(authentication);
 
-        return user.getFollowingJournals()
+        return journalRepository.findFollowingJournalSummaries(user.getUserId())
                 .stream()
-                .map(JournalResponse::fromEntity)
+                .map(this::toJournalResponse)
                 .toList();
     }
 
@@ -164,5 +159,16 @@ public class JournalService {
     private Journal getJournalById(Long journalId) {
         return journalRepository.findById(journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Journal not found with id: " + journalId));
+    }
+
+    private JournalResponse toJournalResponse(Object[] row) {
+        return new JournalResponse(
+                ((Number) row[0]).longValue(),
+                (String) row[1],
+                (String) row[2],
+                (String) row[3],
+                (String) row[4],
+                ((Number) row[5]).longValue(),
+                ((Number) row[6]).longValue());
     }
 }
