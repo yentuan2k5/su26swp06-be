@@ -53,6 +53,8 @@ public class TopicService {
         @Transactional(readOnly = true)
         public TopicResponse getTopicDetail(Long topicId) {
                 return researchTopicRepository.findTopicSummaryById(topicId)
+                                .stream()
+                                .findFirst()
                                 .map(this::toTopicResponse)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Topic not found with id: " + topicId));

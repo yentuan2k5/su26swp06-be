@@ -76,7 +76,7 @@ public interface ResearchTopicRepository extends JpaRepository<ResearchTopic, Lo
             WHERE t.researchTopicId = :topicId
             GROUP BY t.researchTopicId, t.name, t.description
             """)
-    Optional<Object[]> findTopicSummaryById(@Param("topicId") Long topicId);
+    List<Object[]> findTopicSummaryById(@Param("topicId") Long topicId);
 
     @Query("""
             SELECT

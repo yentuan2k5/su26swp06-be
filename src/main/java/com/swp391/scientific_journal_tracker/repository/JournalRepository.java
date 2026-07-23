@@ -89,7 +89,7 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
             WHERE j.journalId = :journalId
             GROUP BY j.journalId, j.title, j.issn, j.publisher, j.field
             """)
-    Optional<Object[]> findJournalSummaryById(@Param("journalId") Long journalId);
+    List<Object[]> findJournalSummaryById(@Param("journalId") Long journalId);
 
     @Query("""
             SELECT

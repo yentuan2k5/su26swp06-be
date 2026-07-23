@@ -62,6 +62,8 @@ public class JournalService {
     @Transactional(readOnly = true)
     public JournalResponse getJournalDetail(Long journalId) {
         return journalRepository.findJournalSummaryById(journalId)
+                .stream()
+                .findFirst()
                 .map(this::toJournalResponse)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Journal not found with id: " + journalId));
