@@ -1,6 +1,7 @@
 package com.swp391.scientific_journal_tracker.dto.request;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
@@ -16,6 +17,7 @@ public class BackfillOpenAlexRequest {
     @Min(value = 1900, message = "toYear không hợp lệ")
     private Integer toYear;
 
+    @NotEmpty(message = "fieldIds không được để trống")
     private List<String> fieldIds;
 
     @Positive(message = "maxResults phải lớn hơn 0")
