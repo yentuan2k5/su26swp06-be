@@ -94,6 +94,25 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             Pageable pageable);
 
     @Query(value = """
+            SELECT p
+            FROM ResearchPaper p
+            WHERE (:year IS NULL OR p.year = :year)
+            AND (:yearFrom IS NULL OR p.year >= :yearFrom)
+            AND (:yearTo IS NULL OR p.year <= :yearTo)
+            """, countQuery = """
+            SELECT COUNT(p)
+            FROM ResearchPaper p
+            WHERE (:year IS NULL OR p.year = :year)
+            AND (:yearFrom IS NULL OR p.year >= :yearFrom)
+            AND (:yearTo IS NULL OR p.year <= :yearTo)
+            """)
+    Page<ResearchPaper> searchPapersByYearRange(
+            @Param("year") Integer year,
+            @Param("yearFrom") Integer yearFrom,
+            @Param("yearTo") Integer yearTo,
+            Pageable pageable);
+
+    @Query(value = """
             SELECT DISTINCT p
             FROM ResearchPaper p
             LEFT JOIN p.keywords k

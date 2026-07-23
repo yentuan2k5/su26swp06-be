@@ -53,13 +53,49 @@ public class PaperService {
                 safeSize,
                 Sort.by(direction, safeSortBy));
 
+        String safeSearch = emptyToNull(search);
+        String safeAuthor = emptyToNull(author);
+        String safeKeyword = emptyToNull(keyword);
+        String safeJournal = emptyToNull(journal);
+        String safeTopic = emptyToNull(topic);
+
+        boolean hasTextFilter = safeSearch != null
+                || safeAuthor != null
+                || safeKeyword != null
+                || safeJournal != null
+                || safeTopic != null;
+
+        boolean hasYearFilter = year != null
+                || yearFrom != null
+                || yearTo != null;
+
+        /*
+         * Tách query để trang danh sách paper mặc định không phải JOIN
+         * keyword / topic / journal / author. Chỉ khi người dùng search
+         * hoặc dùng filter text mới chạy query nâng cao.
+         */
+        if (!hasTextFilter && !hasYearFilter) {
+            return researchPaperRepository.findAll(pageRequest)
+                    .map(PaperResponse::fromEntity);
+        }
+
+        if (!hasTextFilter) {
+            return researchPaperRepository
+                    .searchPapersByYearRange(
+                            year,
+                            yearFrom,
+                            yearTo,
+                            pageRequest)
+                    .map(PaperResponse::fromEntity);
+        }
+
         return researchPaperRepository
                 .searchPapersAdvanced(
-                        emptyToNull(search),
-                        emptyToNull(author),
-                        emptyToNull(keyword),
-                        emptyToNull(journal),
-                        emptyToNull(topic),
+                        safeSearch,
+                        safeAuthor,
+                        safeKeyword,
+                        safeJournal,
+                        safeTopic,
                         year,
                         yearFrom,
                         yearTo,
