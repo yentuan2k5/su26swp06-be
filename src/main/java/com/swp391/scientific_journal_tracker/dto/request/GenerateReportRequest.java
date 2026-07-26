@@ -1,5 +1,9 @@
 package com.swp391.scientific_journal_tracker.dto.request;
 
+import java.util.List;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -11,4 +15,21 @@ public class GenerateReportRequest {
     private String keyword;
 
     private String topic;
+
+    /*
+     * Danh sách section mà frontend muốn đưa vào report.
+     * Ví dụ:
+     * OVERALL_STATISTICS, PAPERS_BY_YEAR, TOP_KEYWORDS, TOP_JOURNALS,
+     * TOP_CITED_PAPERS, KEYWORD_TREND, TOPIC_TREND, TOP_TRENDING_TOPICS.
+     *
+     * Nếu không truyền, backend giữ hành vi cũ và sinh đầy đủ các section.
+     */
+    private List<String> sections;
+
+    @Min(value = 1, message = "Time horizon tối thiểu là 1 năm")
+    @Max(value = 30, message = "Time horizon tối đa là 30 năm")
+    private Integer timeHorizonYears;
+
+    @Size(max = 20, message = "Định dạng report tối đa 20 ký tự")
+    private String format;
 }

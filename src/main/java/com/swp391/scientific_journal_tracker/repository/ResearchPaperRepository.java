@@ -70,6 +70,231 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
     List<Object[]> countTopJournals(Pageable pageable);
 
     @Query("""
+            SELECT COUNT(p)
+            FROM ResearchPaper p
+            WHERE (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            """)
+    long countReportPapers(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic);
+
+    @Query("""
+            SELECT COUNT(p)
+            FROM ResearchPaper p
+            WHERE p.sourceApi = :sourceApi
+            AND (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            """)
+    long countReportPapersBySource(
+            @Param("sourceApi") String sourceApi,
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic);
+
+    @Query("""
+            SELECT COUNT(DISTINCT j)
+            FROM ResearchPaper p
+            JOIN p.journal j
+            WHERE (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            """)
+    long countReportJournals(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic);
+
+    @Query("""
+            SELECT COUNT(DISTINCT k)
+            FROM ResearchPaper p
+            JOIN p.keywords k
+            WHERE (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            """)
+    long countReportKeywords(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic);
+
+    @Query("""
+            SELECT p.year, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            WHERE p.year IS NOT NULL
+            AND (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            GROUP BY p.year
+            ORDER BY p.year ASC
+            """)
+    List<Object[]> countReportPapersByYear(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic);
+
+    @Query("""
+            SELECT k.term, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            JOIN p.keywords k
+            WHERE (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            GROUP BY k.keywordId, k.term
+            ORDER BY COUNT(DISTINCT p) DESC
+            """)
+    List<Object[]> countReportTopKeywords(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic,
+            Pageable pageable);
+
+    @Query("""
+            SELECT j.title, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            JOIN p.journal j
+            WHERE (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            GROUP BY j.journalId, j.title
+            ORDER BY COUNT(DISTINCT p) DESC
+            """)
+    List<Object[]> countReportTopJournals(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic,
+            Pageable pageable);
+
+    @Query("""
+            SELECT p
+            FROM ResearchPaper p
+            WHERE (:fromYear IS NULL OR p.year >= :fromYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            ORDER BY p.citationCount DESC
+            """)
+    List<ResearchPaper> findReportTopCitedPapers(
+            @Param("fromYear") Integer fromYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic,
+            Pageable pageable);
+
+    @Query("""
             SELECT DISTINCT p
             FROM ResearchPaper p
             LEFT JOIN p.keywords k
@@ -335,6 +560,49 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             @Param("recentStartYear") int recentStartYear,
             @Param("previousStartYear") int previousStartYear,
             @Param("previousEndYear") int previousEndYear);
+
+    @Query("""
+            SELECT t.name,
+                   SUM(CASE
+                           WHEN p.year BETWEEN :recentStartYear
+                               AND (:recentStartYear + :previousEndYear - :previousStartYear)
+                           THEN 1
+                           ELSE 0
+                       END),
+                   SUM(CASE
+                           WHEN p.year BETWEEN :previousStartYear AND :previousEndYear
+                           THEN 1
+                           ELSE 0
+                       END)
+            FROM ResearchPaper p
+            JOIN p.researchTopics t
+            WHERE p.year IS NOT NULL
+            AND p.year BETWEEN :previousStartYear
+                AND (:recentStartYear + :previousEndYear - :previousStartYear)
+            AND (
+                :keyword IS NULL
+                OR EXISTS (
+                    SELECT keywordFilter.keywordId
+                    FROM p.keywords keywordFilter
+                    WHERE LOWER(keywordFilter.term) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                )
+            )
+            AND (
+                :topic IS NULL
+                OR EXISTS (
+                    SELECT topicFilter.researchTopicId
+                    FROM p.researchTopics topicFilter
+                    WHERE LOWER(topicFilter.name) LIKE LOWER(CONCAT('%', :topic, '%'))
+                )
+            )
+            GROUP BY t.researchTopicId, t.name
+            """)
+    List<Object[]> getReportTopicGrowthStats(
+            @Param("recentStartYear") int recentStartYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            @Param("keyword") String keyword,
+            @Param("topic") String topic);
 
     @Query("""
                 SELECT t.name, COUNT(DISTINCT p)

@@ -13,6 +13,7 @@ public class DashboardReportChartsResponse {
     private List<DashboardChartItemResponse> papersByYear;
     private List<DashboardChartItemResponse> topKeywords;
     private List<DashboardChartItemResponse> topJournals;
+    private List<PaperResponse> topCitedPapers;
     private List<TrendResponse> keywordTrend;
     private List<TrendResponse> topicTrend;
     private List<TopTopicResponse> topTrendingTopics;
