@@ -456,30 +456,30 @@ public class DashboardReportService {
                 .toList();
     }
 
-    private List<TrendResponse> filterTrendByYear(
-            List<TrendResponse> trend,
-            Integer fromYear) {
-        if (trend == null || trend.isEmpty()) {
-            return List.of();
-        }
+    // private List<TrendResponse> filterTrendByYear(
+    // List<TrendResponse> trend,
+    // Integer fromYear) {
+    // if (trend == null || trend.isEmpty()) {
+    // return List.of();
+    // }
 
-        if (fromYear == null) {
-            return trend;
-        }
+    // if (fromYear == null) {
+    // return trend;
+    // }
 
-        return trend.stream()
-                .filter(item -> item.getYear() >= fromYear)
-                .toList();
-    }
+    // return trend.stream()
+    // .filter(item -> item.getYear() >= fromYear)
+    // .toList();
+    // }
 
     private List<TrendResponse> getFilteredReportTrend(
             String keyword,
             String topic,
             Integer fromYear) {
         return researchPaperRepository.countReportPapersByYear(
-                        fromYear,
-                        keyword,
-                        topic)
+                fromYear,
+                keyword,
+                topic)
                 .stream()
                 .map(row -> new TrendResponse(
                         (Integer) row[0],
