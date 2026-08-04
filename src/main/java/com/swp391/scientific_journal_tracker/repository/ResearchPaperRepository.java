@@ -671,4 +671,200 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
     List<Object[]> getTop5TrendingTopics(
             @Param("fromYear") Integer fromYear,
             Pageable pageable);
+
+    /** Thống kê node gốc Keyword theo tổng paper và hai giai đoạn xu hướng. */
+    @Query("""
+            SELECT COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.keywords k
+            WHERE k.keywordId = :keywordId
+            """)
+    Object[] getKeywordMindMapStats(
+            @Param("keywordId") Long keywordId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear);
+
+    /** Thống kê node gốc Topic theo tổng paper và hai giai đoạn xu hướng. */
+    @Query("""
+            SELECT COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.researchTopics t
+            WHERE t.researchTopicId = :topicId
+            """)
+    Object[] getTopicMindMapStats(
+            @Param("topicId") Long topicId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear);
+
+    @Query("""
+            SELECT t.researchTopicId, t.name, COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.keywords rootKeyword
+            JOIN p.researchTopics t
+            WHERE rootKeyword.keywordId = :keywordId
+            GROUP BY t.researchTopicId, t.name
+            ORDER BY COUNT(DISTINCT p) DESC, t.name ASC
+            """)
+    List<Object[]> findMindMapTopicsForKeyword(
+            @Param("keywordId") Long keywordId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            Pageable pageable);
+
+    @Query("""
+            SELECT relatedKeyword.keywordId, relatedKeyword.term, COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.keywords rootKeyword
+            JOIN p.keywords relatedKeyword
+            WHERE rootKeyword.keywordId = :keywordId
+            AND relatedKeyword.keywordId <> :keywordId
+            GROUP BY relatedKeyword.keywordId, relatedKeyword.term
+            ORDER BY COUNT(DISTINCT p) DESC, relatedKeyword.term ASC
+            """)
+    List<Object[]> findMindMapKeywordsForKeyword(
+            @Param("keywordId") Long keywordId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            Pageable pageable);
+
+    @Query("""
+            SELECT j.journalId, j.title, COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.keywords rootKeyword
+            JOIN p.journal j
+            WHERE rootKeyword.keywordId = :keywordId
+            GROUP BY j.journalId, j.title
+            ORDER BY COUNT(DISTINCT p) DESC, j.title ASC
+            """)
+    List<Object[]> findMindMapJournalsForKeyword(
+            @Param("keywordId") Long keywordId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            Pageable pageable);
+
+    @Query("""
+            SELECT relatedTopic.researchTopicId, relatedTopic.name, COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.researchTopics rootTopic
+            JOIN p.researchTopics relatedTopic
+            WHERE rootTopic.researchTopicId = :topicId
+            AND relatedTopic.researchTopicId <> :topicId
+            GROUP BY relatedTopic.researchTopicId, relatedTopic.name
+            ORDER BY COUNT(DISTINCT p) DESC, relatedTopic.name ASC
+            """)
+    List<Object[]> findMindMapTopicsForTopic(
+            @Param("topicId") Long topicId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            Pageable pageable);
+
+    @Query("""
+            SELECT k.keywordId, k.term, COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.researchTopics rootTopic
+            JOIN p.keywords k
+            WHERE rootTopic.researchTopicId = :topicId
+            GROUP BY k.keywordId, k.term
+            ORDER BY COUNT(DISTINCT p) DESC, k.term ASC
+            """)
+    List<Object[]> findMindMapKeywordsForTopic(
+            @Param("topicId") Long topicId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            Pageable pageable);
+
+    @Query("""
+            SELECT j.journalId, j.title, COUNT(DISTINCT p),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :recentStartYear AND :currentYear THEN 1
+                       ELSE 0
+                   END), 0),
+                   COALESCE(SUM(CASE
+                       WHEN p.year BETWEEN :previousStartYear AND :previousEndYear THEN 1
+                       ELSE 0
+                   END), 0)
+            FROM ResearchPaper p
+            JOIN p.researchTopics rootTopic
+            JOIN p.journal j
+            WHERE rootTopic.researchTopicId = :topicId
+            GROUP BY j.journalId, j.title
+            ORDER BY COUNT(DISTINCT p) DESC, j.title ASC
+            """)
+    List<Object[]> findMindMapJournalsForTopic(
+            @Param("topicId") Long topicId,
+            @Param("recentStartYear") int recentStartYear,
+            @Param("currentYear") int currentYear,
+            @Param("previousStartYear") int previousStartYear,
+            @Param("previousEndYear") int previousEndYear,
+            Pageable pageable);
 }

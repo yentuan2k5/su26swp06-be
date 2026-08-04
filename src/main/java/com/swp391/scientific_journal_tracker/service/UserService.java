@@ -49,11 +49,22 @@ public class UserService {
     public UserResponse updateUserRole(Long userId, String role) {
         User user = findUser(userId);
         User.Role newRole = parseRole(role);
+        User.Role currentRole = user.getRole();
 
-        if (user.getRole() == User.Role.ADMIN
-                && newRole != User.Role.ADMIN
-                && userRepository.findByRole(User.Role.ADMIN).size() <= 1) {
-            throw new BadRequestException("Không thể đổi role của admin cuối cùng trong hệ thống");
+        if (currentRole != newRole) {
+            List<User> admins = userRepository.findByRoleForUpdate(User.Role.ADMIN);
+
+            if (newRole == User.Role.ADMIN && currentRole != User.Role.ADMIN) {
+                throw new BadRequestException(
+                        "Hệ thống chỉ cho phép một tài khoản ADMIN");
+            }
+
+            if (currentRole == User.Role.ADMIN
+                    && newRole != User.Role.ADMIN
+                    && admins.size() <= 1) {
+                throw new BadRequestException(
+                        "Không thể đổi role của admin duy nhất trong hệ thống");
+            }
         }
 
         user.setRole(newRole);
@@ -65,10 +76,13 @@ public class UserService {
         User user = findUser(userId);
 
         if (user.getRole() == User.Role.ADMIN) {
-            long adminCount = userRepository.findByRole(User.Role.ADMIN).size();
+            long adminCount = userRepository
+                    .findByRoleForUpdate(User.Role.ADMIN)
+                    .size();
 
             if (adminCount <= 1) {
-                throw new BadRequestException("Không thể xóa admin cuối cùng của hệ thống");
+                throw new BadRequestException(
+                        "Không thể xóa admin duy nhất trong hệ thống");
             }
         }
 

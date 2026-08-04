@@ -9,6 +9,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -28,6 +30,13 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        List<User> existingAdmins = userRepository.findByRole(User.Role.ADMIN);
+
+        if (existingAdmins.size() > 1) {
+            throw new IllegalStateException(
+                    "Dữ liệu không hợp lệ: hệ thống chỉ được có một tài khoản ADMIN");
+        }
+
         if (!adminInitializationEnabled) {
             log.info("Default admin initialization is disabled");
             return;
@@ -35,14 +44,21 @@ public class DataInitializer implements CommandLineRunner {
 
         validateAdminConfiguration();
 
-        if (userRepository.existsByEmail(adminEmail)) {
-            log.info("Admin account already exists");
+        if (!existingAdmins.isEmpty()) {
+            log.info("A system admin account already exists");
             return;
+        }
+
+        String normalizedAdminEmail = adminEmail.trim().toLowerCase();
+
+        if (userRepository.existsByEmail(normalizedAdminEmail)) {
+            throw new IllegalStateException(
+                    "ADMIN_EMAIL đang thuộc về một tài khoản không phải ADMIN");
         }
 
         User admin = new User();
         admin.setUsername("System Admin");
-        admin.setEmail(adminEmail.trim().toLowerCase());
+        admin.setEmail(normalizedAdminEmail);
         admin.setPasswordHash(passwordEncoder.encode(adminPassword));
         admin.setRole(User.Role.ADMIN);
         admin.setProvider("local");
