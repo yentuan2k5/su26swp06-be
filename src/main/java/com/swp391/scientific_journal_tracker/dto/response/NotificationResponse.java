@@ -16,6 +16,9 @@ public class NotificationResponse {
     private Long notificationId;
     private Long userId;
     private String message;
+    private Long paperId;
+    private String matchedReason;
+    private String type;
     private boolean isRead;
     private LocalDateTime sendAt;
 
@@ -24,6 +27,9 @@ public class NotificationResponse {
                 notification.getNotificationId(),
                 notification.getUserId(),
                 notification.getMessage(),
+                notification.getPaperId(),
+                notification.getMatchedReason(),
+                notification.getType(),
                 notification.isRead(),
                 notification.getSendAt());
     }

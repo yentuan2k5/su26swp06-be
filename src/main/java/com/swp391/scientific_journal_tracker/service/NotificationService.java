@@ -1,8 +1,10 @@
 package com.swp391.scientific_journal_tracker.service;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -118,20 +120,20 @@ public class NotificationService {
          * Từ đây dùng biến paper vừa query lại từ database.
          */
 
-        Map<Long, User> recipients = new LinkedHashMap<>();
+        Map<Long, String> recipientReasons = new LinkedHashMap<>();
 
         if (paper.getJournalId() != null) {
             journalRepository.findById(paper.getJournalId())
-                    .ifPresent(journal -> addJournalFollowers(recipients, journal));
+                    .ifPresent(journal -> addJournalFollowers(recipientReasons, journal));
         }
 
         if (paper.getResearchTopics() != null) {
             for (ResearchTopic topic : paper.getResearchTopics()) {
-                addTopicFollowers(recipients, topic);
+                addTopicFollowers(recipientReasons, topic);
             }
         }
 
-        if (recipients.isEmpty()) {
+        if (recipientReasons.isEmpty()) {
             return;
         }
 
@@ -139,42 +141,76 @@ public class NotificationService {
 
         String message = "New paper published: " + title;
 
-        List<Notification> notifications = recipients.values()
+        Set<Long> recipientIds = recipientReasons.keySet();
+        Set<Long> alreadyNotified = new HashSet<>(notificationRepository
+                .findByPaperIdAndTypeAndUserIdIn(
+                        paper.getResearchPaperId(),
+                        Notification.TYPE_NEW_PAPER,
+                        recipientIds)
                 .stream()
-                .map(user -> {
+                .map(Notification::getUserId)
+                .toList());
+
+        List<Notification> notifications = recipientReasons.entrySet()
+                .stream()
+                .filter(entry -> !alreadyNotified.contains(entry.getKey()))
+                .map(entry -> {
                     Notification notification = new Notification();
-                    notification.setUserId(user.getUserId());
+                    notification.setUserId(entry.getKey());
                     notification.setMessage(message);
+                    notification.setPaperId(paper.getResearchPaperId());
+                    notification.setMatchedReason(entry.getValue());
+                    notification.setType(Notification.TYPE_NEW_PAPER);
                     notification.setRead(false);
                     return notification;
                 })
                 .toList();
 
-        notificationRepository.saveAll(notifications);
+        if (!notifications.isEmpty()) {
+            notificationRepository.saveAll(notifications);
+        }
     }
 
-    private void addJournalFollowers(Map<Long, User> recipients, Journal journal) {
+    private void addJournalFollowers(Map<Long, String> recipientReasons, Journal journal) {
         if (journal == null || journal.getFollowers() == null) {
             return;
         }
 
         for (User user : journal.getFollowers()) {
             if (user != null && user.getUserId() != null) {
-                recipients.putIfAbsent(user.getUserId(), user);
+                addReason(
+                        recipientReasons,
+                        user.getUserId(),
+                        "Following journal: " + journal.getTitle());
             }
         }
     }
 
-    private void addTopicFollowers(Map<Long, User> recipients, ResearchTopic topic) {
+    private void addTopicFollowers(Map<Long, String> recipientReasons, ResearchTopic topic) {
         if (topic == null || topic.getFollowers() == null) {
             return;
         }
 
         for (User user : topic.getFollowers()) {
             if (user != null && user.getUserId() != null) {
-                recipients.putIfAbsent(user.getUserId(), user);
+                addReason(
+                        recipientReasons,
+                        user.getUserId(),
+                        "Following topic: " + topic.getName());
             }
         }
+    }
+
+    private void addReason(
+            Map<Long, String> recipientReasons,
+            Long userId,
+            String reason) {
+        recipientReasons.merge(
+                userId,
+                reason,
+                (existing, incoming) -> existing.equals(incoming)
+                        ? existing
+                        : existing + "; " + incoming);
     }
 
     private User getCurrentUser(Authentication authentication) {

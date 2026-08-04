@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Attach Railway Backend",
+            "request": "attach",
+            "hostName": "altaria.proxy.rlwy.net",
+            "port": 54839,
+            "timeout": 30000
+        }
+    ]
+}
