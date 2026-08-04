@@ -55,6 +55,19 @@ public class DashboardReportService {
             SECTION_TOPIC_TREND,
             SECTION_TOP_TRENDING_TOPICS);
 
+    /*
+     * Lecturer chỉ được tạo báo cáo phục vụ giảng dạy/tổng quan.
+     * Các section phân tích xu hướng chuyên sâu được dành cho Researcher
+     * và Admin. Quy tắc này phải nằm ở service để không thể vượt quyền
+     * chỉ bằng cách gọi trực tiếp REST API.
+     */
+    private static final Set<String> LECTURER_REPORT_SECTIONS = Set.of(
+            SECTION_OVERALL_STATISTICS,
+            SECTION_PAPERS_BY_YEAR,
+            SECTION_TOP_KEYWORDS,
+            SECTION_TOP_JOURNALS,
+            SECTION_TOP_CITED_PAPERS);
+
     private final DashboardReportRepository dashboardReportRepository;
     private final UserRepository userRepository;
     private final ResearchPaperRepository researchPaperRepository;
@@ -75,7 +88,7 @@ public class DashboardReportService {
     @Transactional
     public DashboardReportResponse generateReport(GenerateReportRequest request, Authentication authentication) {
         User user = getCurrentUser(authentication);
-        Set<String> sections = resolveSections(request);
+        Set<String> sections = resolveSections(request, user);
         Integer fromYear = resolveFromYear(request.getTimeHorizonYears());
         String keyword = normalize(request.getKeyword());
         String topic = normalize(request.getTopic());
@@ -376,20 +389,64 @@ public class DashboardReportService {
                         : List.of());
     }
 
-    private Set<String> resolveSections(GenerateReportRequest request) {
-        if (request.getSections() == null || request.getSections().isEmpty()) {
-            return DEFAULT_REPORT_SECTIONS;
+    private Set<String> resolveSections(
+            GenerateReportRequest request,
+            User user) {
+        boolean usesDefaultSections = request.getSections() == null
+                || request.getSections().isEmpty();
+
+        Set<String> requestedSections = usesDefaultSections
+                ? DEFAULT_REPORT_SECTIONS
+                : request.getSections()
+                        .stream()
+                        .map(this::normalizeSection)
+                        .filter(DEFAULT_REPORT_SECTIONS::contains)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (requestedSections.isEmpty()) {
+            requestedSections = DEFAULT_REPORT_SECTIONS;
+            usesDefaultSections = true;
         }
 
-        Set<String> sections = request.getSections()
-                .stream()
-                .map(this::normalizeSection)
-                .filter(DEFAULT_REPORT_SECTIONS::contains)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return resolveSectionsForRole(
+                requestedSections,
+                usesDefaultSections,
+                user.getRole());
+    }
 
-        return sections.isEmpty()
-                ? DEFAULT_REPORT_SECTIONS
-                : sections;
+    /**
+     * Áp dụng quyền ở tầng business thay vì chỉ ẩn nút ở frontend.
+     * Lecturer dùng default sẽ nhận bộ section cơ bản. Nếu chủ động gửi
+     * section nâng cao qua API thì trả 403 để quyền không thể bị vượt qua.
+     */
+    private Set<String> resolveSectionsForRole(
+            Set<String> requestedSections,
+            boolean usesDefaultSections,
+            User.Role role) {
+        if (role == User.Role.ADMIN || role == User.Role.RESEARCHER) {
+            return requestedSections;
+        }
+
+        if (role == User.Role.LECTURER) {
+            if (usesDefaultSections) {
+                return LECTURER_REPORT_SECTIONS;
+            }
+
+            Set<String> forbiddenSections = requestedSections.stream()
+                    .filter(section -> !LECTURER_REPORT_SECTIONS.contains(section))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+
+            if (!forbiddenSections.isEmpty()) {
+                throw new AccessDeniedException(
+                        "Lecturer không có quyền dùng section nâng cao: "
+                                + String.join(", ", forbiddenSections));
+            }
+
+            return requestedSections;
+        }
+
+        throw new AccessDeniedException(
+                "Role hiện tại không có quyền tạo analytical report");
     }
 
     private String normalizeSection(String section) {
