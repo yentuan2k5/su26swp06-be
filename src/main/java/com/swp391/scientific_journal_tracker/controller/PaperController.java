@@ -1,5 +1,7 @@
 package com.swp391.scientific_journal_tracker.controller;
 
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -8,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
+import com.swp391.scientific_journal_tracker.dto.response.PaperComparisonResponse;
 import com.swp391.scientific_journal_tracker.service.PaperService;
 
 import lombok.RequiredArgsConstructor;
@@ -64,6 +67,24 @@ public class PaperController {
                 size,
                 sortBy,
                 sortDir);
+    }
+
+    /**
+     * So sánh metadata của từ hai đến bốn paper.
+     *
+     * Ví dụ:
+     * GET /api/papers/compare?ids=120&ids=121&ids=122
+     *
+     * Response gồm metadata từng paper, keyword/topic chung và riêng, cùng độ
+     * tương đồng của từng cặp paper. Không xử lý toàn văn PDF và không ghi dữ
+     * liệu xuống database.
+     *
+     * @param ids từ 2 đến 4 ResearchPaperId khác nhau
+     * @return dữ liệu cho bảng và ma trận so sánh ở frontend
+     */
+    @GetMapping("/compare")
+    public PaperComparisonResponse comparePapers(@RequestParam List<Long> ids) {
+        return paperService.comparePapers(ids);
     }
 
     @GetMapping("/{id}")
