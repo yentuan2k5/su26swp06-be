@@ -516,6 +516,47 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
     List<Object[]> getTrendByTopic(@Param("topic") String topic);
 
     /**
+     * So sánh số lượng paper theo từng năm của nhiều keyword.
+     *
+     * LOWER được dùng để so sánh không phân biệt chữ hoa/thường. Khác với API
+     * trend một keyword, API compare yêu cầu tên keyword khớp chính xác để
+     * các series trên cùng biểu đồ không bị lẫn với keyword gần giống nhau.
+     */
+    @Query("""
+            SELECT LOWER(k.term), p.year, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            JOIN p.keywords k
+            WHERE p.year BETWEEN :fromYear AND :toYear
+            AND LOWER(k.term) IN :keywordNames
+            GROUP BY LOWER(k.term), p.year
+            ORDER BY p.year ASC
+            """)
+    List<Object[]> getKeywordComparisonTrends(
+            @Param("keywordNames") List<String> keywordNames,
+            @Param("fromYear") int fromYear,
+            @Param("toYear") int toYear);
+
+    /**
+     * So sánh số lượng paper theo từng năm của nhiều research topic.
+     *
+     * Tên topic được đối sánh chính xác, không dùng LIKE, để mỗi đường biểu đồ
+     * đại diện cho đúng một topic người dùng đã chọn.
+     */
+    @Query("""
+            SELECT LOWER(t.name), p.year, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            JOIN p.researchTopics t
+            WHERE p.year BETWEEN :fromYear AND :toYear
+            AND LOWER(t.name) IN :topicNames
+            GROUP BY LOWER(t.name), p.year
+            ORDER BY p.year ASC
+            """)
+    List<Object[]> getTopicComparisonTrends(
+            @Param("topicNames") List<String> topicNames,
+            @Param("fromYear") int fromYear,
+            @Param("toYear") int toYear);
+
+    /**
      * Đếm số lượng paper theo từng năm thuộc một lĩnh vực cụ thể.
      *
      * Query đi từ ResearchPaper sang Journal vì field đang được lưu trong

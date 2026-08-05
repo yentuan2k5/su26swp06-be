@@ -1,8 +1,11 @@
 package com.swp391.scientific_journal_tracker.service;
 
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -12,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.swp391.scientific_journal_tracker.dto.response.TopKeywordResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonSeriesResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
 import com.swp391.scientific_journal_tracker.exception.BadRequestException;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
@@ -31,6 +36,8 @@ public class TrendService {
         private final ResearchPaperRepository researchPaperRepository;
 
         private static final int DEFAULT_TREND_PERIOD_YEARS = 5;
+        private static final int MIN_COMPARE_ITEMS = 2;
+        private static final int MAX_COMPARE_ITEMS = 4;
         private static final String TREND_TYPE_GROWING = "GROWING";
         private static final String TREND_TYPE_EMERGING = "EMERGING";
 
@@ -201,6 +208,83 @@ public class TrendService {
                                 .toList();
         }
 
+        /**
+         * So sánh xu hướng công bố của từ hai đến bốn keyword hoặc topic trong
+         * cùng một khoảng năm. Mỗi series luôn có đủ các năm trong khoảng đã
+         * chọn; năm không có bài được trả về paperCount = 0 để frontend vẽ
+         * biểu đồ nhiều đường trên cùng một trục thời gian.
+         *
+         * Growth rate của mỗi series được tính từ năm đầu đến năm cuối:
+         * (lastYearCount - firstYearCount) / firstYearCount. Nếu năm đầu bằng
+         * 0 nhưng năm cuối có bài, hệ thống quy ước growth rate là 1.0 để tránh
+         * chia cho 0, tương ứng mức tăng 100%.
+         *
+         * @param type     KEYWORD hoặc TOPIC
+         * @param itemNames tên chính xác của các keyword/topic cần so sánh
+         * @param fromYear năm bắt đầu, mặc định là năm đầu của 5 năm gần đây
+         * @param toYear   năm kết thúc, mặc định là năm hiện tại
+         * @return dữ liệu chuỗi theo năm và growth rate của từng mục
+         */
+        @Transactional(readOnly = true)
+        public TrendComparisonResponse compareTrends(
+                        String type,
+                        List<String> itemNames,
+                        Integer fromYear,
+                        Integer toYear) {
+                int currentYear = Year.now().getValue();
+                int safeFromYear = fromYear == null
+                                ? currentYear - DEFAULT_TREND_PERIOD_YEARS + 1
+                                : fromYear;
+                int safeToYear = toYear == null ? currentYear : toYear;
+
+                validateComparisonYears(safeFromYear, safeToYear, currentYear);
+                LinkedHashMap<String, String> requestedNames = normalizeComparisonNames(itemNames);
+                String safeType = normalizeComparisonType(type);
+
+                List<Object[]> rows = "KEYWORD".equals(safeType)
+                                ? researchPaperRepository.getKeywordComparisonTrends(
+                                                new ArrayList<>(requestedNames.keySet()),
+                                                safeFromYear,
+                                                safeToYear)
+                                : researchPaperRepository.getTopicComparisonTrends(
+                                                new ArrayList<>(requestedNames.keySet()),
+                                                safeFromYear,
+                                                safeToYear);
+
+                Map<String, Map<Integer, Long>> countsByNameAndYear = new LinkedHashMap<>();
+                requestedNames.keySet().forEach(name -> countsByNameAndYear.put(name, new LinkedHashMap<>()));
+                for (Object[] row : rows) {
+                        String normalizedName = (String) row[0];
+                        countsByNameAndYear.get(normalizedName).put(
+                                        (Integer) row[1],
+                                        ((Number) row[2]).longValue());
+                }
+
+                List<String> missingNames = requestedNames.keySet().stream()
+                                .filter(name -> countsByNameAndYear.get(name).isEmpty())
+                                .map(requestedNames::get)
+                                .toList();
+                if (!missingNames.isEmpty()) {
+                        throw new BadRequestException(
+                                        "Không tìm thấy dữ liệu " + safeType.toLowerCase()
+                                                        + " cho: " + String.join(", ", missingNames));
+                }
+
+                List<TrendComparisonSeriesResponse> series = requestedNames.entrySet().stream()
+                                .map(entry -> toComparisonSeries(
+                                                entry.getValue(),
+                                                countsByNameAndYear.get(entry.getKey()),
+                                                safeFromYear,
+                                                safeToYear))
+                                .toList();
+
+                return new TrendComparisonResponse(
+                                safeType,
+                                safeFromYear,
+                                safeToYear,
+                                series);
+        }
+
         private TopTopicResponse toTopTopicResponse(Object[] row) {
                 long recentCount = ((Number) row[1]).longValue();
                 long previousCount = ((Number) row[2]).longValue();
@@ -278,6 +362,75 @@ public class TrendService {
                 return keyword == null
                                 ? ""
                                 : keyword.trim().toLowerCase();
+        }
+
+        private void validateComparisonYears(
+                        int fromYear,
+                        int toYear,
+                        int currentYear) {
+                if (fromYear > toYear) {
+                        throw new BadRequestException("fromYear không được lớn hơn toYear");
+                }
+                if (fromYear < 1900 || toYear > currentYear) {
+                        throw new BadRequestException(
+                                        "Khoảng năm phải nằm trong khoảng từ 1900 đến năm hiện tại");
+                }
+        }
+
+        private LinkedHashMap<String, String> normalizeComparisonNames(List<String> itemNames) {
+                if (itemNames == null) {
+                        throw new BadRequestException("Cần chọn từ 2 đến 4 keyword hoặc topic để so sánh");
+                }
+
+                LinkedHashMap<String, String> requestedNames = new LinkedHashMap<>();
+                itemNames.stream()
+                                .filter(name -> name != null && !name.isBlank())
+                                .forEach(name -> requestedNames.putIfAbsent(
+                                                normalizeKeyword(name),
+                                                name.trim()));
+
+                if (requestedNames.size() < MIN_COMPARE_ITEMS
+                                || requestedNames.size() > MAX_COMPARE_ITEMS) {
+                        throw new BadRequestException(
+                                        "Cần chọn từ 2 đến 4 keyword hoặc topic khác nhau để so sánh");
+                }
+
+                return requestedNames;
+        }
+
+        private String normalizeComparisonType(String type) {
+                if (type == null || type.isBlank()) {
+                        throw new BadRequestException("type phải là KEYWORD hoặc TOPIC");
+                }
+
+                String safeType = type.trim().toUpperCase();
+                if (!"KEYWORD".equals(safeType) && !"TOPIC".equals(safeType)) {
+                        throw new BadRequestException("type phải là KEYWORD hoặc TOPIC");
+                }
+
+                return safeType;
+        }
+
+        private TrendComparisonSeriesResponse toComparisonSeries(
+                        String name,
+                        Map<Integer, Long> yearlyCounts,
+                        int fromYear,
+                        int toYear) {
+                List<TrendResponse> yearlyData = new ArrayList<>();
+                long totalPapers = 0;
+                for (int year = fromYear; year <= toYear; year++) {
+                        long paperCount = yearlyCounts.getOrDefault(year, 0L);
+                        totalPapers += paperCount;
+                        yearlyData.add(new TrendResponse(year, paperCount));
+                }
+
+                long firstYearCount = yearlyCounts.getOrDefault(fromYear, 0L);
+                long lastYearCount = yearlyCounts.getOrDefault(toYear, 0L);
+                return new TrendComparisonSeriesResponse(
+                                name,
+                                totalPapers,
+                                calculateGrowthRate(lastYearCount, firstYearCount),
+                                yearlyData);
         }
 
         private double calculateGrowthRate(

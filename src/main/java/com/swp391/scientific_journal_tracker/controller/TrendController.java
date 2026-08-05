@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.swp391.scientific_journal_tracker.dto.response.TopKeywordResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
 import com.swp391.scientific_journal_tracker.service.TrendService;
 
@@ -76,6 +77,30 @@ public class TrendController {
             @RequestParam String field) {
         return ResponseEntity.ok(
                 trendService.getTrendByField(field));
+    }
+
+    /**
+     * So sánh xu hướng công bố của nhiều keyword hoặc topic trên cùng một
+     * khoảng thời gian.
+     *
+     * Ví dụ:
+     * GET /api/trends/compare?type=KEYWORD&items=machine%20learning
+     * &items=deep%20learning&fromYear=2023&toYear=2025
+     *
+     * @param type     KEYWORD hoặc TOPIC
+     * @param items    từ 2 đến 4 tên keyword/topic, truyền lặp lại trên query string
+     * @param fromYear năm bắt đầu, có thể để trống
+     * @param toYear   năm kết thúc, có thể để trống
+     * @return các series có cùng trục năm để frontend vẽ biểu đồ so sánh
+     */
+    @GetMapping("/compare")
+    public ResponseEntity<TrendComparisonResponse> compareTrends(
+            @RequestParam String type,
+            @RequestParam(name = "items") List<String> items,
+            @RequestParam(required = false) Integer fromYear,
+            @RequestParam(required = false) Integer toYear) {
+        return ResponseEntity.ok(
+                trendService.compareTrends(type, items, fromYear, toYear));
     }
 
     /**
