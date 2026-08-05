@@ -42,6 +42,13 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
 
     long countBySourceApi(String sourceApi);
 
+    long countByYear(Integer year);
+
+    long countByCitationCountGreaterThanEqual(Integer citationCount);
+
+    @Query("SELECT COALESCE(SUM(p.citationCount), 0) FROM ResearchPaper p")
+    Long sumCitationCount();
+
     @Query("""
                 SELECT p.year, COUNT(p)
                 FROM ResearchPaper p

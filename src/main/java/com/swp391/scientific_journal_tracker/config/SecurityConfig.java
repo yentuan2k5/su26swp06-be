@@ -93,9 +93,10 @@ public class SecurityConfig {
                                                 .requestMatchers(
                                                                 "/api/papers/**",
                                                                 "/api/keywords/**",
-                                                                "/api/dashboard/**",
                                                                 "/api/trends/**")
                                                 .permitAll()
+
+                                                .requestMatchers("/api/dashboard/**").authenticated()
 
                                                 .requestMatchers(
                                                                 "/api/journals/following",
