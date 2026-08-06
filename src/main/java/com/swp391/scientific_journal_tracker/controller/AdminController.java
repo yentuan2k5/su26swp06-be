@@ -97,20 +97,6 @@ public class AdminController {
     }
 
     /**
-     * POST /api/admin/sync/logs/{id}/cancel
-     * Request cooperative cancellation for an active job, or close an orphaned RUNNING log.
-     */
-    @PostMapping("/sync/logs/{id}/cancel")
-    public ResponseEntity<?> cancelSyncLog(
-            @PathVariable @Positive(message = "syncLogId must be a positive integer") long id) {
-        try {
-            return ResponseEntity.ok(syncService.cancelSync(id));
-        } catch (IllegalArgumentException exception) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exception.getMessage());
-        }
-    }
-
-    /**
      * GET /api/admin/system/config
      * Xem cấu hình nguồn dữ liệu và trend hiện tại của hệ thống.
      */
