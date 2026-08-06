@@ -66,7 +66,7 @@ public class SyncService {
     @Value("${openalex.sync.overlap-days:1}")
     private int openAlexOverlapDays;
 
-    @Value("${openalex.backfill.max-results-per-concept:5000}")
+    @Value("${openalex.backfill.max-results-per-concept:20000}")
     private int maxResultsPerConcept;
 
     /**

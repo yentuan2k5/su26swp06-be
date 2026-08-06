@@ -29,7 +29,7 @@ public class BackfillOpenAlexRequest {
                     message = "fieldId phải là số hoặc OpenAlex field ID hợp lệ") String> fieldIds;
 
     @Positive(message = "maxResults phải lớn hơn 0")
-    @Max(value = 5000, message = "maxResults tối đa là 5000")
+    @Max(value = 20000, message = "maxResults tối đa là 20000")
     private Integer maxResults;
 
     @AssertTrue(message = "fromYear phải nhỏ hơn hoặc bằng toYear")
