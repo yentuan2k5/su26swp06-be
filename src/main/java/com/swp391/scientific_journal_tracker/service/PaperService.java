@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
+import com.swp391.scientific_journal_tracker.dto.response.AbstractAnalysisResponse;
 import com.swp391.scientific_journal_tracker.dto.response.PaperComparisonItemResponse;
 import com.swp391.scientific_journal_tracker.dto.response.PaperComparisonResponse;
 import com.swp391.scientific_journal_tracker.dto.response.PaperSimilarityResponse;
@@ -45,6 +46,7 @@ public class PaperService {
             "researchPaperId");
 
     private final ResearchPaperRepository researchPaperRepository;
+    private final AbstractAnalysisService abstractAnalysisService;
 
     @Transactional(readOnly = true)
     public Page<PaperResponse> getPapers(
@@ -174,11 +176,14 @@ public class PaperService {
 
     private PaperComparisonItemResponse toComparisonItem(ResearchPaper researchPaper) {
         PaperResponse paper = PaperResponse.fromEntity(researchPaper);
+        AbstractAnalysisResponse abstractAnalysis = abstractAnalysisService
+                .analyze(researchPaper.getAbstractText());
         return new PaperComparisonItemResponse(
                 paper,
                 calculateCitationsPerYear(paper),
                 List.of(),
-                List.of());
+                List.of(),
+                abstractAnalysis);
     }
 
     private List<Long> validateComparisonIds(List<Long> ids) {

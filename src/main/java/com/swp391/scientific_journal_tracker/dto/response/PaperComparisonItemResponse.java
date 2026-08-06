@@ -15,4 +15,5 @@ public class PaperComparisonItemResponse {
     private double citationsPerYear;
     private List<String> uniqueKeywords;
     private List<String> uniqueTopics;
+    private AbstractAnalysisResponse abstractAnalysis;
 }

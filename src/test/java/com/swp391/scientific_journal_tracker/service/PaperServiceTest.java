@@ -3,6 +3,7 @@ package com.swp391.scientific_journal_tracker.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.swp391.scientific_journal_tracker.dto.response.PaperComparisonResponse;
+import com.swp391.scientific_journal_tracker.dto.response.AbstractAnalysisResponse;
 import com.swp391.scientific_journal_tracker.entity.Keyword;
 import com.swp391.scientific_journal_tracker.entity.ResearchPaper;
 import com.swp391.scientific_journal_tracker.entity.ResearchTopic;
@@ -26,6 +28,9 @@ class PaperServiceTest {
     @Mock
     private ResearchPaperRepository researchPaperRepository;
 
+    @Mock
+    private AbstractAnalysisService abstractAnalysisService;
+
     @InjectMocks
     private PaperService paperService;
 
@@ -34,6 +39,7 @@ class PaperServiceTest {
         ResearchPaper firstPaper = createPaper(
                 10L,
                 "Transformer for NLP",
+                "This study investigates language models. We propose a transformer method. Results show improved accuracy.",
                 2024,
                 120,
                 List.of("Artificial Intelligence", "Transformer"),
@@ -41,6 +47,7 @@ class PaperServiceTest {
         ResearchPaper secondPaper = createPaper(
                 11L,
                 "Vision Foundation Models",
+                "This work addresses a challenge in computer vision. We introduce a vision model. Experiments demonstrate strong results.",
                 2023,
                 95,
                 List.of("Artificial Intelligence", "Computer Vision"),
@@ -48,6 +55,13 @@ class PaperServiceTest {
 
         when(researchPaperRepository.findAllById(List.of(10L, 11L)))
                 .thenReturn(List.of(firstPaper, secondPaper));
+        when(abstractAnalysisService.analyze(anyString()))
+                .thenReturn(new AbstractAnalysisResponse(
+                        "ABSTRACT_AVAILABLE",
+                        List.of("Objective"),
+                        List.of(),
+                        List.of("Method"),
+                        List.of("Result")));
 
         PaperComparisonResponse response = paperService.comparePapers(List.of(10L, 11L));
 
@@ -62,6 +76,7 @@ class PaperServiceTest {
         assertEquals(1, response.getSimilarities().size());
         assertEquals(0.3333, response.getSimilarities().getFirst().getKeywordSimilarity());
         assertTrue(response.getPapers().getFirst().getCitationsPerYear() > 0);
+        assertEquals("ABSTRACT_AVAILABLE", response.getPapers().getFirst().getAbstractAnalysis().getSource());
     }
 
     @Test
@@ -77,6 +92,7 @@ class PaperServiceTest {
     private ResearchPaper createPaper(
             Long id,
             String title,
+            String abstractText,
             int year,
             int citationCount,
             List<String> keywordTerms,
@@ -84,6 +100,7 @@ class PaperServiceTest {
         ResearchPaper paper = new ResearchPaper();
         paper.setResearchPaperId(id);
         paper.setTitle(title);
+        paper.setAbstractText(abstractText);
         paper.setYear(year);
         paper.setCitationCount(citationCount);
         paper.setKeywords(keywordTerms.stream()
