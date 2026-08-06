@@ -6,6 +6,7 @@ import com.swp391.scientific_journal_tracker.dto.response.SystemConfigResponse;
 import com.swp391.scientific_journal_tracker.dto.response.SyncLogResponse;
 import com.swp391.scientific_journal_tracker.repository.SyncLogRepository;
 import com.swp391.scientific_journal_tracker.service.DashboardReportService;
+import com.swp391.scientific_journal_tracker.service.OpenAlexBackfillJobService;
 import com.swp391.scientific_journal_tracker.service.SyncService;
 import com.swp391.scientific_journal_tracker.service.SystemConfigService;
 import com.swp391.scientific_journal_tracker.service.UserService;
@@ -35,6 +36,7 @@ public class AdminController {
     private final DashboardReportService dashboardReportService;
     private final UserService userService;
     private final SyncService syncService;
+    private final OpenAlexBackfillJobService openAlexBackfillJobService;
     private final SystemConfigService systemConfigService;
     private final SyncLogRepository syncLogRepository;
 
@@ -53,17 +55,36 @@ public class AdminController {
 
     /**
      * POST /api/admin/sync/backfill
-     * Backfill dữ liệu lịch sử từ OpenAlex theo field và khoảng năm xuất bản.
+     * Queue backfill dữ liệu lịch sử từ OpenAlex theo field và khoảng năm xuất bản.
+     * Response 202 trả SyncLog RUNNING để frontend poll tiến trình qua sync logs.
      */
     @PostMapping("/sync/backfill")
     public ResponseEntity<?> triggerBackfill(
             @Valid @RequestBody BackfillOpenAlexRequest request) {
         try {
-            return ResponseEntity.ok(syncService.backfillFromOpenAlex(
+            SyncLogResponse queuedLog = syncService.queueBackfillFromOpenAlex(
                     request.getFromYear(),
                     request.getToYear(),
                     request.getFieldIds(),
-                    request.getMaxResults()));
+                    request.getMaxResults());
+
+            try {
+                openAlexBackfillJobService.runBackfill(
+                        queuedLog.getSyncLogId(),
+                        request.getFromYear(),
+                        request.getToYear(),
+                        request.getFieldIds(),
+                        request.getMaxResults());
+            } catch (RuntimeException exception) {
+                syncService.cancelQueuedBackfill(
+                        queuedLog.getSyncLogId(),
+                        "Không thể khởi chạy backfill nền: " + exception.getMessage());
+
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body("Không thể khởi chạy backfill nền. Hãy thử lại sau.");
+            }
+
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(queuedLog);
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (IllegalArgumentException e) {

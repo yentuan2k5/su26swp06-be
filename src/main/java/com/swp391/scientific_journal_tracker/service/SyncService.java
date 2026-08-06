@@ -282,29 +282,96 @@ public class SyncService {
                         fromYear,
                         toYear,
                         fieldIds,
-                        maxResultsOverride));
+                        maxResultsOverride,
+                        null));
+    }
+
+    /**
+     * Tạo SyncLog và giữ quyền chạy backfill trước khi chuyển tác vụ sang thread nền.
+     *
+     * Controller trả về ngay SyncLog này để client theo dõi qua API sync logs,
+     * thay vì phải giữ HTTP request mở suốt thời gian OpenAlex trả nhiều page.
+     */
+    public SyncLogResponse queueBackfillFromOpenAlex(
+            int fromYear,
+            int toYear,
+            List<String> fieldIds,
+            Integer maxResultsOverride) {
+        validateBackfillRequest(fromYear, toYear, fieldIds);
+
+        if (!syncInProgress.compareAndSet(false, true)) {
+            throw new IllegalStateException(
+                    "Đang có một lần sync hoặc backfill khác chạy, vui lòng đợi.");
+        }
+
+        try {
+            SyncLog queuedLog = createBackfillSyncLog(LocalDateTime.now());
+
+            return SyncLogResponse.from(queuedLog);
+        } catch (RuntimeException exception) {
+            syncInProgress.set(false);
+            throw exception;
+        }
+    }
+
+    /**
+     * Thực thi backfill đã được queue. Method này chỉ được gọi từ
+     * OpenAlexBackfillJobService, sau khi queueBackfillFromOpenAlex() đã giữ lock.
+     */
+    public void runQueuedBackfillFromOpenAlex(
+            Long syncLogId,
+            int fromYear,
+            int toYear,
+            List<String> fieldIds,
+            Integer maxResultsOverride) {
+        try {
+            SyncLog syncLog = syncLogRepository.findById(syncLogId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Không tìm thấy SyncLog backfill: " + syncLogId));
+
+            doBackfillFromOpenAlex(
+                    fromYear,
+                    toYear,
+                    fieldIds,
+                    maxResultsOverride,
+                    syncLog);
+        } catch (Exception exception) {
+            log.error(
+                    "Không thể chạy backfill đã queue. syncLogId={}, error={}",
+                    syncLogId,
+                    exception.getMessage(),
+                    exception);
+
+            markQueuedBackfillFailed(syncLogId, exception.getMessage());
+        } finally {
+            syncInProgress.set(false);
+        }
+    }
+
+    /**
+     * Giải phóng lock và đánh dấu SyncLog thất bại nếu executor không nhận job.
+     */
+    public void cancelQueuedBackfill(Long syncLogId, String reason) {
+        markQueuedBackfillFailed(syncLogId, reason);
+        syncInProgress.set(false);
     }
 
     private SyncLogResponse doBackfillFromOpenAlex(
             int fromYear,
             int toYear,
             List<String> fieldIds,
-            Integer maxResultsOverride) {
-        if (fromYear > toYear) {
-            throw new IllegalArgumentException(
-                    "fromYear không được lớn hơn toYear");
-        }
-
-        List<String> safeFieldIds = normalizeOpenAlexFieldIds(fieldIds);
-
-        if (safeFieldIds.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Danh sách fieldIds không được để trống");
-        }
+            Integer maxResultsOverride,
+            SyncLog existingSyncLog) {
+        List<String> safeFieldIds = validateBackfillRequest(
+                fromYear,
+                toYear,
+                fieldIds);
 
         int safeMaxResultsPerConcept = resolveBackfillMaxResults(maxResultsOverride);
 
-        LocalDateTime backfillStartedAt = LocalDateTime.now();
+        LocalDateTime backfillStartedAt = existingSyncLog != null
+                ? existingSyncLog.getStartedAt()
+                : LocalDateTime.now();
 
         log.info(
                 "=== Bắt đầu backfill OpenAlex: fromYear={}, "
@@ -314,12 +381,9 @@ public class SyncService {
                 safeFieldIds,
                 safeMaxResultsPerConcept);
 
-        SyncLog syncLog = new SyncLog();
-        syncLog.setSourceApi(SOURCE_OPENALEX_BACKFILL);
-        syncLog.setStatus(Status.RUNNING);
-        syncLog.setStartedAt(backfillStartedAt);
-        syncLog.setPaperSynced(0);
-        syncLog = syncLogRepository.save(syncLog);
+        SyncLog syncLog = existingSyncLog != null
+                ? existingSyncLog
+                : createBackfillSyncLog(backfillStartedAt);
 
         AtomicInteger totalSynced = new AtomicInteger(0);
         AtomicInteger totalFailed = new AtomicInteger(0);
@@ -424,6 +488,46 @@ public class SyncService {
 
             return SyncLogResponse.from(savedLog);
         }
+    }
+
+    private List<String> validateBackfillRequest(
+            int fromYear,
+            int toYear,
+            List<String> fieldIds) {
+        if (fromYear > toYear) {
+            throw new IllegalArgumentException(
+                    "fromYear không được lớn hơn toYear");
+        }
+
+        List<String> safeFieldIds = normalizeOpenAlexFieldIds(fieldIds);
+
+        if (safeFieldIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Danh sách fieldIds không được để trống");
+        }
+
+        return safeFieldIds;
+    }
+
+    private SyncLog createBackfillSyncLog(LocalDateTime startedAt) {
+        SyncLog syncLog = new SyncLog();
+        syncLog.setSourceApi(SOURCE_OPENALEX_BACKFILL);
+        syncLog.setStatus(Status.RUNNING);
+        syncLog.setStartedAt(startedAt);
+        syncLog.setPaperSynced(0);
+
+        return syncLogRepository.save(syncLog);
+    }
+
+    private void markQueuedBackfillFailed(Long syncLogId, String reason) {
+        syncLogRepository.findById(syncLogId).ifPresent(syncLog -> {
+            syncLog.setStatus(Status.FAILED);
+            syncLog.setErrorMessage(reason == null || reason.isBlank()
+                    ? "Không thể khởi chạy backfill"
+                    : reason);
+            syncLog.setFinishedAt(LocalDateTime.now());
+            syncLogRepository.save(syncLog);
+        });
     }
 
     private int resolveBackfillMaxResults(Integer maxResultsOverride) {
