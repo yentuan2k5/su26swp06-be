@@ -1,6 +1,8 @@
 package com.swp391.scientific_journal_tracker.service;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -86,5 +88,38 @@ class DashboardReportServiceTest {
 
         verify(dashboardReportRepository).findByDashboardReportIdAndUserUserId(99L, 10L);
         verify(dashboardReportRepository).delete(report);
+    }
+
+    @Test
+    void keywordTrendDoesNotFilterTheGeneralCatalogSummary() {
+        User researcher = new User();
+        researcher.setUserId(20L);
+        researcher.setUsername("researcher");
+        researcher.setRole(User.Role.RESEARCHER);
+
+        GenerateReportRequest request = new GenerateReportRequest();
+        request.setTitle("AI trend report");
+        request.setKeyword("machine learning");
+        request.setSections(List.of("OVERALL_STATISTICS", "KEYWORD_TREND"));
+
+        when(userRepository.findByUsername("researcher")).thenReturn(Optional.of(researcher));
+        when(researchPaperRepository.countReportPapers(null, null, null)).thenReturn(100L);
+        when(researchPaperRepository.countReportJournals(null, null, null)).thenReturn(12L);
+        when(researchPaperRepository.countReportKeywords(null, null, null)).thenReturn(25L);
+        when(researchPaperRepository.countReportPapersBySource("openalex", null, null, null))
+                .thenReturn(80L);
+        when(researchPaperRepository.countReportPapersByYear(null, "machine learning", null))
+                .thenReturn(List.<Object[]>of(new Object[] { 2025, 4L }));
+        when(dashboardReportRepository.save(any(DashboardReport.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = dashboardReportService.generateReport(
+                request,
+                new UsernamePasswordAuthenticationToken("researcher", null));
+
+        assertTrue(response.getContent().contains("Total papers: 100"));
+        assertTrue(response.getContent().contains("OpenAlex papers: 80"));
+        verify(researchPaperRepository).countReportPapers(null, null, null);
+        verify(researchPaperRepository).countReportPapersByYear(null, "machine learning", null);
     }
 }

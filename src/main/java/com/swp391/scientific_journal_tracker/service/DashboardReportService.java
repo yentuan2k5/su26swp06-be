@@ -93,8 +93,8 @@ public class DashboardReportService {
         String keyword = normalize(request.getKeyword());
         String topic = normalize(request.getTopic());
         DashboardSummaryResponse summary = buildReportSummary(
-                keyword,
-                topic,
+                null,
+                null,
                 fromYear,
                 sections);
         DashboardReportChartsResponse charts = buildReportCharts(
@@ -259,8 +259,8 @@ public class DashboardReportService {
                 keyword,
                 topic,
                 buildReportSummary(
-                        keyword,
-                        topic,
+                        null,
+                        null,
                         fromYear,
                         sections),
                 sections,
@@ -369,12 +369,12 @@ public class DashboardReportService {
                 sections.contains(SECTION_KEYWORD_TREND) && keyword != null
                         ? getFilteredReportTrend(
                                 keyword,
-                                topic,
+                                null,
                                 fromYear)
                         : List.of(),
                 sections.contains(SECTION_TOPIC_TREND) && topic != null
                         ? getFilteredReportTrend(
-                                keyword,
+                                null,
                                 topic,
                                 fromYear)
                         : List.of(),

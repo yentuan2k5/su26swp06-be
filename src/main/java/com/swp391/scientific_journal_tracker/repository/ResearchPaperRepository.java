@@ -105,7 +105,7 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
     @Query("""
             SELECT COUNT(p)
             FROM ResearchPaper p
-            WHERE p.sourceApi = :sourceApi
+            WHERE LOWER(p.sourceApi) = LOWER(:sourceApi)
             AND (:fromYear IS NULL OR p.year >= :fromYear)
             AND (
                 :keyword IS NULL
