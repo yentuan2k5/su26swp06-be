@@ -70,6 +70,16 @@ public class SyncService {
     private int maxResultsPerConcept;
 
     /**
+     * Backfill có thể nhập nhiều dữ liệu lịch sử. Chỉ gửi thông báo cho số bài mới
+     * giới hạn để tránh làm ngập notification của người dùng.
+     */
+    @Value("${openalex.backfill.notifications.enabled:true}")
+    private boolean backfillNotificationsEnabled;
+
+    @Value("${openalex.backfill.notifications.max-new-papers:50}")
+    private int backfillNotificationMaxNewPapers;
+
+    /**
      * Entry point chính, gọi từ Scheduler hoặc AdminController.
      */
     public SyncLogResponse syncFromOpenAlex() {
@@ -375,11 +385,14 @@ public class SyncService {
 
         log.info(
                 "=== Bắt đầu backfill OpenAlex: fromYear={}, "
-                        + "toYear={}, fieldIds={}, maxResultsPerConcept={} ===",
+                        + "toYear={}, fieldIds={}, maxResultsPerConcept={}, "
+                        + "notificationsEnabled={}, notificationPaperLimit={} ===",
                 fromYear,
                 toYear,
                 safeFieldIds,
-                safeMaxResultsPerConcept);
+                safeMaxResultsPerConcept,
+                backfillNotificationsEnabled,
+                Math.max(0, backfillNotificationMaxNewPapers));
 
         SyncLog syncLog = existingSyncLog != null
                 ? existingSyncLog
@@ -387,6 +400,8 @@ public class SyncService {
 
         AtomicInteger totalSynced = new AtomicInteger(0);
         AtomicInteger totalFailed = new AtomicInteger(0);
+        AtomicInteger notificationPaperCount = new AtomicInteger(0);
+        int safeNotificationPaperLimit = Math.max(0, backfillNotificationMaxNewPapers);
 
         try {
             ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
@@ -408,13 +423,19 @@ public class SyncService {
                         papers -> {
                             for (Map<String, Object> paperData : papers) {
                                 try {
+                                    boolean shouldSendNotification = backfillNotificationsEnabled
+                                            && notificationPaperCount.get() < safeNotificationPaperLimit;
+
                                     boolean isNewPaper = processOpenAlexWork(
                                             paperData,
                                             openAlexSource,
-                                            false);
+                                            shouldSendNotification);
 
                                     if (isNewPaper) {
                                         totalSynced.incrementAndGet();
+                                        if (shouldSendNotification) {
+                                            notificationPaperCount.incrementAndGet();
+                                        }
                                     }
 
                                 } catch (Exception exception) {
@@ -464,9 +485,10 @@ public class SyncService {
 
             log.info(
                     "=== Backfill OpenAlex hoàn tất: "
-                            + "{} paper mới, {} paper lỗi ===",
+                            + "{} paper mới, {} paper lỗi, {} paper mới đã kích hoạt notification ===",
                     totalSynced.get(),
-                    totalFailed.get());
+                    totalFailed.get(),
+                    notificationPaperCount.get());
 
             return SyncLogResponse.from(savedLog);
 
