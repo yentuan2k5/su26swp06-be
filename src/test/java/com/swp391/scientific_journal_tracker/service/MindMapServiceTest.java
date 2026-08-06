@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.util.List;
 import java.util.Optional;
@@ -71,5 +73,29 @@ class MindMapServiceTest {
         assertThrows(
                 BadRequestException.class,
                 () -> mindMapService.getMindMap("JOURNAL", 1L, 5));
+    }
+
+    @Test
+    void buildsLecturerBasicMindMapWithoutKeywordOrJournalBranches() {
+        Keyword keyword = new Keyword();
+        keyword.setKeywordId(7L);
+        keyword.setTerm("Transformer");
+
+        when(keywordRepository.findById(7L)).thenReturn(Optional.of(keyword));
+        when(researchPaperRepository.getKeywordMindMapStats(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class)))
+                .thenReturn(new Object[] { 40L, 30L, 10L });
+        when(researchPaperRepository.findMindMapTopicsForKeyword(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class), any(Pageable.class)))
+                .thenReturn(List.<Object[]>of(new Object[] { 11L, "Natural Language Processing", 20L, 15L, 5L }));
+
+        MindMapResponse response = mindMapService.getBasicMindMap("KEYWORD", 7L);
+
+        assertEquals(2, response.getNodes().size());
+        assertEquals(1, response.getEdges().size());
+        verify(researchPaperRepository, never()).findMindMapKeywordsForKeyword(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class), any(Pageable.class));
+        verify(researchPaperRepository, never()).findMindMapJournalsForKeyword(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class), any(Pageable.class));
     }
 }

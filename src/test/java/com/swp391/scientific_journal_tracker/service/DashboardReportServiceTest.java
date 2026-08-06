@@ -1,6 +1,7 @@
 package com.swp391.scientific_journal_tracker.service;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import com.swp391.scientific_journal_tracker.dto.request.GenerateReportRequest;
+import com.swp391.scientific_journal_tracker.entity.DashboardReport;
 import com.swp391.scientific_journal_tracker.entity.User;
 import com.swp391.scientific_journal_tracker.repository.DashboardReportRepository;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
@@ -64,5 +66,25 @@ class DashboardReportServiceTest {
                 dashboardReportRepository,
                 researchPaperRepository,
                 syncLogRepository);
+    }
+
+    @Test
+    void deletesReportOnlyWhenRepositoryFindsItForCurrentOwner() {
+        User owner = new User();
+        owner.setUserId(10L);
+        owner.setUsername("researcher");
+        DashboardReport report = new DashboardReport();
+        report.setDashboardReportId(99L);
+        report.setUser(owner);
+
+        when(userRepository.findByUsername("researcher")).thenReturn(Optional.of(owner));
+        when(dashboardReportRepository.findByDashboardReportIdAndUserUserId(99L, 10L))
+                .thenReturn(Optional.of(report));
+
+        dashboardReportService.deleteMyReport(99L,
+                new UsernamePasswordAuthenticationToken("researcher", null));
+
+        verify(dashboardReportRepository).findByDashboardReportIdAndUserUserId(99L, 10L);
+        verify(dashboardReportRepository).delete(report);
     }
 }

@@ -140,8 +140,7 @@ public class DashboardReportService {
     @Transactional(readOnly = true)
     public DashboardReportResponse getMyReportDetail(Long reportId, Authentication authentication) {
         User user = getCurrentUser(authentication);
-        DashboardReport report = findReport(reportId);
-        checkOwner(report, user);
+        DashboardReport report = findMyReport(reportId, user);
 
         return DashboardReportResponse.fromEntity(
                 report,
@@ -157,9 +156,9 @@ public class DashboardReportService {
             return getMyReports(authentication);
         }
 
-        return dashboardReportRepository.findByTitleContainingIgnoreCase(safeKeyword)
+        return dashboardReportRepository
+                .findByUserUserIdAndTitleContainingIgnoreCaseOrderByGeneratedAtDesc(user.getUserId(), safeKeyword)
                 .stream()
-                .filter(report -> report.getUser() != null && report.getUser().getUserId().equals(user.getUserId()))
                 .map(DashboardReportResponse::fromEntity)
                 .toList();
     }
@@ -167,8 +166,7 @@ public class DashboardReportService {
     @Transactional
     public void deleteMyReport(Long reportId, Authentication authentication) {
         User user = getCurrentUser(authentication);
-        DashboardReport report = findReport(reportId);
-        checkOwner(report, user);
+        DashboardReport report = findMyReport(reportId, user);
 
         dashboardReportRepository.delete(report);
     }
@@ -802,15 +800,14 @@ public class DashboardReportService {
         content.append("\n");
     }
 
-    private DashboardReport findReport(Long reportId) {
-        return dashboardReportRepository.findById(reportId)
+    /**
+     * Ownership được đưa thẳng vào điều kiện query để report của người khác
+     * không bị nạp vào persistence context chỉ vì client đoán được ID.
+     */
+    private DashboardReport findMyReport(Long reportId, User user) {
+        return dashboardReportRepository
+                .findByDashboardReportIdAndUserUserId(reportId, user.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
-    }
-
-    private void checkOwner(DashboardReport report, User user) {
-        if (report.getUser() == null || !report.getUser().getUserId().equals(user.getUserId())) {
-            throw new AccessDeniedException("You do not have permission to access this report");
-        }
     }
 
     private User getCurrentUser(Authentication authentication) {

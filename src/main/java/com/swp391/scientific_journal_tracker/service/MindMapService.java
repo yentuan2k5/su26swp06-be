@@ -31,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class MindMapService {
 
     private static final int MAX_LIMIT = 10;
+    private static final int LECTURER_BASIC_LIMIT = 3;
     private static final int TREND_PERIOD_YEARS = 5;
 
     private final KeywordRepository keywordRepository;
@@ -50,6 +51,25 @@ public class MindMapService {
         return rootType == MindMapType.KEYWORD
                 ? buildKeywordMindMap(id, safeLimit, trendWindow)
                 : buildTopicMindMap(id, safeLimit, trendWindow);
+    }
+
+    /**
+     * Bản mind map cơ bản dành cho Lecturer. Chỉ trả về node gốc và tối đa ba
+     * topic liên quan trực tiếp; không trả nhánh keyword hoặc journal để phân
+     * biệt với bản đầy đủ của Researcher/Admin ở tầng backend.
+     */
+    @Transactional(readOnly = true)
+    public MindMapResponse getBasicMindMap(String type, Long id) {
+        if (id == null || id <= 0) {
+            throw new BadRequestException("id phải là số nguyên dương");
+        }
+
+        MindMapType rootType = parseType(type);
+        TrendWindow trendWindow = TrendWindow.current();
+
+        return rootType == MindMapType.KEYWORD
+                ? buildBasicKeywordMindMap(id, trendWindow)
+                : buildBasicTopicMindMap(id, trendWindow);
     }
 
     private MindMapResponse buildKeywordMindMap(
@@ -152,6 +172,68 @@ public class MindMapService {
                         pageRequest));
 
         return assembleMindMap(root, relatedTopics, relatedKeywords, relatedJournals);
+    }
+
+    private MindMapResponse buildBasicKeywordMindMap(
+            Long keywordId,
+            TrendWindow trendWindow) {
+        Keyword keyword = keywordRepository.findById(keywordId)
+                .orElseThrow(() -> new ResourceNotFoundException("Keyword not found: " + keywordId));
+
+        MindMapNodeResponse root = toNode(
+                MindMapType.KEYWORD,
+                keyword.getKeywordId(),
+                keyword.getTerm(),
+                researchPaperRepository.getKeywordMindMapStats(
+                        keywordId,
+                        trendWindow.recentStartYear(),
+                        trendWindow.currentYear(),
+                        trendWindow.previousStartYear(),
+                        trendWindow.previousEndYear()),
+                0);
+
+        List<MindMapNodeResponse> relatedTopics = toNodes(
+                MindMapType.TOPIC,
+                researchPaperRepository.findMindMapTopicsForKeyword(
+                        keywordId,
+                        trendWindow.recentStartYear(),
+                        trendWindow.currentYear(),
+                        trendWindow.previousStartYear(),
+                        trendWindow.previousEndYear(),
+                        PageRequest.of(0, LECTURER_BASIC_LIMIT)));
+
+        return assembleMindMap(root, relatedTopics, List.of(), List.of());
+    }
+
+    private MindMapResponse buildBasicTopicMindMap(
+            Long topicId,
+            TrendWindow trendWindow) {
+        ResearchTopic topic = researchTopicRepository.findById(topicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic not found: " + topicId));
+
+        MindMapNodeResponse root = toNode(
+                MindMapType.TOPIC,
+                topic.getResearchTopicId(),
+                topic.getName(),
+                researchPaperRepository.getTopicMindMapStats(
+                        topicId,
+                        trendWindow.recentStartYear(),
+                        trendWindow.currentYear(),
+                        trendWindow.previousStartYear(),
+                        trendWindow.previousEndYear()),
+                0);
+
+        List<MindMapNodeResponse> relatedTopics = toNodes(
+                MindMapType.TOPIC,
+                researchPaperRepository.findMindMapTopicsForTopic(
+                        topicId,
+                        trendWindow.recentStartYear(),
+                        trendWindow.currentYear(),
+                        trendWindow.previousStartYear(),
+                        trendWindow.previousEndYear(),
+                        PageRequest.of(0, LECTURER_BASIC_LIMIT)));
+
+        return assembleMindMap(root, relatedTopics, List.of(), List.of());
     }
 
     private MindMapResponse assembleMindMap(

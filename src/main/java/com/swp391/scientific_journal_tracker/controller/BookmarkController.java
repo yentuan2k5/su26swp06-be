@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,25 +15,27 @@ import org.springframework.web.bind.annotation.RestController;
 import com.swp391.scientific_journal_tracker.dto.response.BookmarkResponse;
 import com.swp391.scientific_journal_tracker.service.BookmarkService;
 
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/bookmarks")
 @RequiredArgsConstructor
+@Validated
 public class BookmarkController {
 
         private final BookmarkService bookmarkService;
 
         @PostMapping("/{paperId}")
         public BookmarkResponse saveBookmark(
-                        @PathVariable Long paperId,
+                        @PathVariable @Positive(message = "paperId phải là số nguyên dương") Long paperId,
                         Authentication authentication) {
                 return bookmarkService.saveBookmark(paperId, authentication);
         }
 
         @DeleteMapping("/{paperId}")
         public Map<String, String> removeBookmark(
-                        @PathVariable Long paperId,
+                        @PathVariable @Positive(message = "paperId phải là số nguyên dương") Long paperId,
                         Authentication authentication) {
                 bookmarkService.removeBookmark(paperId, authentication);
 
@@ -46,7 +49,7 @@ public class BookmarkController {
 
         @GetMapping("/check/{paperId}")
         public Map<String, Boolean> checkBookmarked(
-                        @PathVariable Long paperId,
+                        @PathVariable @Positive(message = "paperId phải là số nguyên dương") Long paperId,
                         Authentication authentication) {
                 boolean bookmarked = bookmarkService.isBookmarked(paperId, authentication);
 
@@ -55,14 +58,14 @@ public class BookmarkController {
 
         @PostMapping("/keywords/{keywordId}")
         public BookmarkResponse saveKeywordBookmark(
-                        @PathVariable Long keywordId,
+                        @PathVariable @Positive(message = "keywordId phải là số nguyên dương") Long keywordId,
                         Authentication authentication) {
                 return bookmarkService.saveKeywordBookmark(keywordId, authentication);
         }
 
         @DeleteMapping("/keywords/{keywordId}")
         public Map<String, String> removeKeywordBookmark(
-                        @PathVariable Long keywordId,
+                        @PathVariable @Positive(message = "keywordId phải là số nguyên dương") Long keywordId,
                         Authentication authentication) {
                 bookmarkService.removeKeywordBookmark(keywordId, authentication);
 
@@ -76,7 +79,7 @@ public class BookmarkController {
 
         @GetMapping("/keywords/check/{keywordId}")
         public Map<String, Boolean> checkKeywordBookmarked(
-                        @PathVariable Long keywordId,
+                        @PathVariable @Positive(message = "keywordId phải là số nguyên dương") Long keywordId,
                         Authentication authentication) {
                 boolean bookmarked = bookmarkService.isKeywordBookmarked(keywordId, authentication);
 

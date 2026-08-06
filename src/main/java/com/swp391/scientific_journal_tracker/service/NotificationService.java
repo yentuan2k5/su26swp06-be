@@ -66,12 +66,9 @@ public class NotificationService {
     public NotificationResponse markAsRead(Long notificationId, Authentication authentication) {
         User user = getCurrentUser(authentication);
 
-        Notification notification = notificationRepository.findById(notificationId)
+        Notification notification = notificationRepository
+                .findByNotificationIdAndUserId(notificationId, user.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
-
-        if (!notification.getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Notification not found");
-        }
 
         notification.setRead(true);
 
@@ -96,12 +93,9 @@ public class NotificationService {
     public void deleteNotification(Long notificationId, Authentication authentication) {
         User user = getCurrentUser(authentication);
 
-        Notification notification = notificationRepository.findById(notificationId)
+        Notification notification = notificationRepository
+                .findByNotificationIdAndUserId(notificationId, user.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
-
-        if (!notification.getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Notification not found");
-        }
 
         notificationRepository.delete(notification);
     }

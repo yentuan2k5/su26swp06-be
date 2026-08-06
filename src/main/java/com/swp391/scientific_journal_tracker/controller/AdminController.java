@@ -12,6 +12,7 @@ import com.swp391.scientific_journal_tracker.service.UserService;
 import com.swp391.scientific_journal_tracker.dto.response.DashboardReportResponse;
 import com.swp391.scientific_journal_tracker.dto.response.UserResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.stream.Collectors;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
+@Validated
 @PreAuthorize("hasRole('ADMIN')") // Chỉ ADMIN mới được gọi
 public class AdminController {
 
@@ -86,7 +89,7 @@ public class AdminController {
      * Xem chi tiết 1 lần sync
      */
     @GetMapping("/sync/logs/{id}")
-    public ResponseEntity<SyncLogResponse> getSyncLog(@PathVariable long id) {
+    public ResponseEntity<SyncLogResponse> getSyncLog(@PathVariable @Positive(message = "syncLogId phải là số nguyên dương") long id) {
         return syncLogRepository.findById(id)
                 .map(SyncLogResponse::from)
                 .map(ResponseEntity::ok)
@@ -113,19 +116,19 @@ public class AdminController {
     }
 
     @GetMapping("/users/{id}")
-    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
+    public ResponseEntity<UserResponse> getUserById(@PathVariable @Positive(message = "userId phải là số nguyên dương") Long id) {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
     @PutMapping("/users/{id}/role")
     public ResponseEntity<UserResponse> updateUserRole(
-            @PathVariable Long id,
+            @PathVariable @Positive(message = "userId phải là số nguyên dương") Long id,
             @Valid @RequestBody UpdateUserRoleRequest request) {
         return ResponseEntity.ok(userService.updateUserRole(id, request.getRole()));
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable @Positive(message = "userId phải là số nguyên dương") Long id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }

@@ -3,6 +3,7 @@ package com.swp391.scientific_journal_tracker.controller;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -83,6 +84,7 @@ public class PaperController {
      * @return dữ liệu cho bảng và ma trận so sánh ở frontend
      */
     @GetMapping("/compare")
+    @PreAuthorize("hasAnyRole('RESEARCHER', 'ADMIN')")
     public PaperComparisonResponse comparePapers(@RequestParam List<Long> ids) {
         return paperService.comparePapers(ids);
     }

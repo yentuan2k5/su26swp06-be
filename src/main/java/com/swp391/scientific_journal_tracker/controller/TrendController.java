@@ -3,6 +3,8 @@ package com.swp391.scientific_journal_tracker.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,6 +14,8 @@ import com.swp391.scientific_journal_tracker.dto.response.TopKeywordResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
+import com.swp391.scientific_journal_tracker.security.ResearchAccessLevel;
+import com.swp391.scientific_journal_tracker.security.ResearchAccessPolicy;
 import com.swp391.scientific_journal_tracker.service.TrendService;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 public class TrendController {
 
     private final TrendService trendService;
+    private final ResearchAccessPolicy researchAccessPolicy;
 
     /**
      * Trả về số lượng paper theo từng năm của một keyword.
@@ -94,6 +99,7 @@ public class TrendController {
      * @return các series có cùng trục năm để frontend vẽ biểu đồ so sánh
      */
     @GetMapping("/compare")
+    @PreAuthorize("hasAnyRole('RESEARCHER', 'ADMIN')")
     public ResponseEntity<TrendComparisonResponse> compareTrends(
             @RequestParam String type,
             @RequestParam(name = "items") List<String> items,
@@ -112,13 +118,16 @@ public class TrendController {
      * @return danh sách topic phổ biến
      */
     @GetMapping("/top-topics")
+    @PreAuthorize("hasAnyRole('LECTURER', 'RESEARCHER', 'ADMIN')")
     public ResponseEntity<List<TopTopicResponse>> getTopTrendingTopics(
             @RequestParam(required = false) Integer fromYear,
-            @RequestParam(defaultValue = "5") int limit) {
+            @RequestParam(defaultValue = "5") int limit,
+            Authentication authentication) {
+        boolean basicAccess = researchAccessPolicy.resolve(authentication) == ResearchAccessLevel.BASIC;
         return ResponseEntity.ok(
                 trendService.getTopTrendingTopics(
-                        fromYear,
-                        limit));
+                        basicAccess ? null : fromYear,
+                        basicAccess ? Math.min(limit, 5) : limit));
     }
 
     /**
@@ -130,12 +139,16 @@ public class TrendController {
      * @return danh sách keyword đang tăng trưởng
      */
     @GetMapping("/top-keywords")
+    @PreAuthorize("hasAnyRole('LECTURER', 'RESEARCHER', 'ADMIN')")
     public ResponseEntity<List<TopKeywordResponse>> getTopTrendingKeywords(
             @RequestParam(required = false) Integer fromYear,
-            @RequestParam(defaultValue = "5") int limit) {
+            @RequestParam(defaultValue = "5") int limit,
+            Authentication authentication) {
+        boolean basicAccess = researchAccessPolicy.resolve(authentication) == ResearchAccessLevel.BASIC;
         return ResponseEntity.ok(
                 trendService.getTopTrendingKeywords(
-                        fromYear,
-                        limit));
+                        basicAccess ? null : fromYear,
+                        basicAccess ? Math.min(limit, 5) : limit));
     }
+
 }

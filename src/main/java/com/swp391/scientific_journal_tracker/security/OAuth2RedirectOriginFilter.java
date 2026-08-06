@@ -10,9 +10,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.net.URI;
-import java.util.regex.Pattern;
-
 /**
  * Khi FE bắt đầu luồng Google OAuth2 (GET /oauth2/authorization/google),
  * nó có thể đính kèm query param redirect_origin = origin (scheme + host)
@@ -23,7 +20,7 @@ import java.util.regex.Pattern;
  * OAuth2SuccessHandler sẽ đọc lại cookie này sau khi Google callback về,
  * để biết redirect người dùng quay lại đúng domain frontend nào.
  *
- * Chỉ chấp nhận origin nằm trong whitelist (localhost hoặc *.vercel.app)
+ * Chỉ chấp nhận origin được cấu hình rõ trong whitelist dùng chung với CORS
  * để tránh bị lợi dụng làm open-redirect.
  */
 @Component
@@ -31,9 +28,11 @@ public class OAuth2RedirectOriginFilter extends OncePerRequestFilter {
 
     public static final String COOKIE_NAME = "oauth2_redirect_origin";
 
-    private static final Pattern ALLOWED_ORIGIN_PATTERN = Pattern.compile(
-            "^https?://(localhost(:\\d+)?|[a-z0-9-]+\\.vercel\\.app)$",
-            Pattern.CASE_INSENSITIVE);
+    private final FrontendOriginPolicy frontendOriginPolicy;
+
+    public OAuth2RedirectOriginFilter(FrontendOriginPolicy frontendOriginPolicy) {
+        this.frontendOriginPolicy = frontendOriginPolicy;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -44,7 +43,7 @@ public class OAuth2RedirectOriginFilter extends OncePerRequestFilter {
         if ("/api/oauth2/authorization/google".equals(request.getServletPath())) {
             String redirectOrigin = request.getParameter("redirect_origin");
 
-            if (isAllowedOrigin(redirectOrigin)) {
+            if (frontendOriginPolicy.isAllowedOrigin(redirectOrigin)) {
                 Cookie cookie = new Cookie(COOKIE_NAME, redirectOrigin);
                 cookie.setPath("/");
                 cookie.setHttpOnly(true);
@@ -56,18 +55,5 @@ public class OAuth2RedirectOriginFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private boolean isAllowedOrigin(String origin) {
-        if (origin == null || origin.isBlank())
-            return false;
-
-        try {
-            URI uri = URI.create(origin);
-            String normalized = uri.getScheme() + "://" + uri.getAuthority();
-            return ALLOWED_ORIGIN_PATTERN.matcher(normalized).matches();
-        } catch (Exception e) {
-            return false;
-        }
     }
 }

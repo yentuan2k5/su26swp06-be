@@ -1,6 +1,7 @@
 package com.swp391.scientific_journal_tracker.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -48,6 +49,26 @@ public class GlobalExceptionHandler {
                                 HttpStatus.BAD_REQUEST,
                                 "JSON gửi lên không hợp lệ",
                                 request);
+        }
+
+        // Lỗi validate ở path variable, request param... khi controller dùng @Validated
+        @ExceptionHandler(ConstraintViolationException.class)
+        public ResponseEntity<Map<String, Object>> handleConstraintViolation(
+                        ConstraintViolationException ex,
+                        HttpServletRequest request) {
+                Map<String, String> errors = new HashMap<>();
+                ex.getConstraintViolations().forEach(violation ->
+                        errors.put(violation.getPropertyPath().toString(), violation.getMessage()));
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("timestamp", LocalDateTime.now());
+                response.put("status", HttpStatus.BAD_REQUEST.value());
+                response.put("error", "Bad Request");
+                response.put("message", "Dữ liệu không hợp lệ");
+                response.put("path", request.getRequestURI());
+                response.put("errors", errors);
+
+                return ResponseEntity.badRequest().body(response);
         }
 
         // Lỗi trùng dữ liệu: username/email đã tồn tại

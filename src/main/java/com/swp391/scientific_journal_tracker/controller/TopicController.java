@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopicResponse;
+import com.swp391.scientific_journal_tracker.security.ResearchAccessLevel;
+import com.swp391.scientific_journal_tracker.security.ResearchAccessPolicy;
 import com.swp391.scientific_journal_tracker.service.TrendService;
 import com.swp391.scientific_journal_tracker.service.TopicService;
 
@@ -28,6 +31,7 @@ public class TopicController {
 
     private final TopicService topicService;
     private final TrendService trendService;
+    private final ResearchAccessPolicy researchAccessPolicy;
 
     @GetMapping
     public List<TopicResponse> getAllTopics() {
@@ -40,10 +44,15 @@ public class TopicController {
     }
 
     @GetMapping("/trending")
+    @PreAuthorize("hasAnyRole('LECTURER', 'RESEARCHER', 'ADMIN')")
     public List<TopTopicResponse> getTrendingTopics(
             @RequestParam(required = false) Integer fromYear,
-            @RequestParam(defaultValue = "10") int limit) {
-        return trendService.getTopTrendingTopics(fromYear, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            Authentication authentication) {
+        boolean basicAccess = researchAccessPolicy.resolve(authentication) == ResearchAccessLevel.BASIC;
+        return trendService.getTopTrendingTopics(
+                basicAccess ? null : fromYear,
+                basicAccess ? Math.min(limit, 5) : limit);
     }
 
     @GetMapping("/popular")
@@ -92,4 +101,5 @@ public class TopicController {
             @RequestParam(defaultValue = "10") int size) {
         return topicService.getPapersByTopic(topicId, page, size);
     }
+
 }

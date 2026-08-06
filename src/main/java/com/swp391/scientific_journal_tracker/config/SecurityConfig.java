@@ -2,8 +2,9 @@ package com.swp391.scientific_journal_tracker.config;
 
 import java.util.List;
 
+import com.swp391.scientific_journal_tracker.security.FrontendOriginPolicy;
 import com.swp391.scientific_journal_tracker.security.OAuth2RedirectOriginFilter;
-import org.springframework.beans.factory.annotation.Value;
+import com.swp391.scientific_journal_tracker.security.RequestRateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -38,9 +39,8 @@ public class SecurityConfig {
         private final JwtAuthenticationFilter jwtAuthFilter;
         private final OAuth2SuccessHandler oAuth2SuccessHandler;
         private final OAuth2RedirectOriginFilter oAuth2RedirectOriginFilter;
-
-        @Value("${app.frontend-url:http://localhost:5173/}")
-        private String frontendUrl;
+        private final RequestRateLimitFilter requestRateLimitFilter;
+        private final FrontendOriginPolicy frontendOriginPolicy;
 
         // Chain 1: dành riêng cho /api/auth/**, public hoàn toàn
         @Bean
@@ -64,7 +64,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                                                 .anyRequest().authenticated())
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                                .addFilterAfter(requestRateLimitFilter, JwtAuthenticationFilter.class);
                 return http.build();
         }
 
@@ -89,6 +90,16 @@ public class SecurityConfig {
                                                                 "/api/oauth2/**",
                                                                 "/error")
                                                 .permitAll()
+
+                                                // API phân tích nâng cao: cần đăng nhập trước khi kiểm tra role
+                                                .requestMatchers(
+                                                                "/api/papers/compare",
+                                                                "/api/trends/compare",
+                                                                "/api/trends/top-topics",
+                                                                "/api/trends/top-keywords",
+                                                                "/api/topics/trending",
+                                                                "/api/mind-map/**")
+                                                .authenticated()
 
                                                 .requestMatchers(
                                                                 "/api/papers/**",
@@ -124,6 +135,7 @@ public class SecurityConfig {
                                                 .successHandler(oAuth2SuccessHandler))
                                 .addFilterBefore(oAuth2RedirectOriginFilter, UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                                .addFilterAfter(requestRateLimitFilter, JwtAuthenticationFilter.class)
                                 .logout(logout -> logout
                                                 .logoutUrl("/logout")
                                                 .invalidateHttpSession(true)
@@ -140,12 +152,7 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration config = new CorsConfiguration();
 
-                config.setAllowedOriginPatterns(List.of(
-                                "http://localhost:5173",
-                                "http://localhost:*",
-                                "https://*.vercel.app",
-                                "https://su26swp06-fe.vercel.app",
-                                frontendUrl.replaceAll("/$", "")));
+                config.setAllowedOrigins(frontendOriginPolicy.getAllowedOrigins());
 
                 config.setAllowedMethods(List.of(
                                 "GET",
