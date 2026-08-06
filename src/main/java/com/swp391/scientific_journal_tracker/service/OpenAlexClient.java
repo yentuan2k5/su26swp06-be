@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -46,6 +47,12 @@ public class OpenAlexClient {
 
         @Value("${openalex.api.key:}")
         private String openAlexApiKey;
+
+        @Value("${openalex.backfill.request-timeout-seconds:60}")
+        private long backfillRequestTimeoutSeconds;
+
+        @Value("${openalex.backfill.retry-max-attempts:3}")
+        private int backfillRetryMaxAttempts;
 
         public OpenAlexClient() {
                 this.webClient = WebClient.builder()
@@ -298,7 +305,9 @@ public class OpenAlexClient {
         private ResponseEntity<Map<String, Object>> requestWorksByFilterPage(
                         String filter,
                         String cursor) {
-                int maxRetries = 3;
+                int maxRetries = Math.max(0, backfillRetryMaxAttempts);
+                Duration timeout = Duration.ofSeconds(
+                                Math.max(1, backfillRequestTimeoutSeconds));
 
                 for (int attempt = 0; attempt <= maxRetries; attempt++) {
                         try {
@@ -310,33 +319,28 @@ public class OpenAlexClient {
                                                 .retrieve()
                                                 .toEntity(new ParameterizedTypeReference<Map<String, Object>>() {
                                                 })
-                                                .timeout(Duration.ofSeconds(20))
+                                                .timeout(timeout)
                                                 .block();
 
                         } catch (WebClientResponseException exception) {
                                 int statusCode = exception.getStatusCode().value();
 
-                                if (statusCode == 429) {
+                                if (statusCode == 429
+                                                || exception.getStatusCode().is5xxServerError()) {
                                         if (attempt == maxRetries) {
-                                                log.error(
-                                                                "OpenAlex rate limit 429 sau khi retry hết. "
-                                                                                + "filter={}, cursor={}, body={}",
+                                                throwOpenAlexRetryExhausted(
+                                                                statusCode,
                                                                 filter,
                                                                 cursor,
-                                                                exception.getResponseBodyAsString(),
-                                                                exception);
-
-                                                throw new IllegalStateException(
-                                                                "OpenAlex đang giới hạn request. "
-                                                                                + "Hãy thử lại sau",
                                                                 exception);
                                         }
 
                                         int retryNumber = attempt + 1;
 
                                         log.warn(
-                                                        "OpenAlex rate limit 429. "
-                                                                        + "filter={}, cursor={}, retry={}/{}, body={}",
+                                                        "OpenAlex tạm thời không khả dụng. "
+                                                                        + "status={}, filter={}, cursor={}, retry={}/{}, body={}",
+                                                        statusCode,
                                                         filter,
                                                         cursor,
                                                         retryNumber,
@@ -358,11 +362,85 @@ public class OpenAlexClient {
                                 throw new IllegalStateException(
                                                 "OpenAlex API trả lỗi HTTP " + statusCode,
                                                 exception);
+                        } catch (RuntimeException exception) {
+                                if (!isTemporaryConnectionFailure(exception)) {
+                                        throw exception;
+                                }
+
+                                if (attempt == maxRetries) {
+                                        log.error(
+                                                        "OpenAlex timeout/lỗi kết nối sau khi retry hết. "
+                                                                        + "filter={}, cursor={}, timeoutSeconds={}",
+                                                        filter,
+                                                        cursor,
+                                                        timeout.toSeconds(),
+                                                        exception);
+
+                                        throw new IllegalStateException(
+                                                        "OpenAlex phản hồi quá chậm hoặc kết nối không ổn định. "
+                                                                        + "Hãy thử lại sau",
+                                                        exception);
+                                }
+
+                                int retryNumber = attempt + 1;
+
+                                log.warn(
+                                                "OpenAlex timeout/lỗi kết nối. "
+                                                                + "filter={}, cursor={}, retry={}/{}, timeoutSeconds={}",
+                                                filter,
+                                                cursor,
+                                                retryNumber,
+                                                maxRetries,
+                                                timeout.toSeconds(),
+                                                exception);
+
+                                sleepBeforeRetry(retryNumber);
                         }
                 }
 
                 throw new IllegalStateException(
                                 "Không thể gọi OpenAlex API sau khi retry");
+        }
+
+        private void throwOpenAlexRetryExhausted(
+                        int statusCode,
+                        String filter,
+                        String cursor,
+                        WebClientResponseException exception) {
+                log.error(
+                                "OpenAlex HTTP {} sau khi retry hết. filter={}, cursor={}, body={}",
+                                statusCode,
+                                filter,
+                                cursor,
+                                exception.getResponseBodyAsString(),
+                                exception);
+
+                String message = statusCode == 429
+                                ? "OpenAlex đang giới hạn request. Hãy thử lại sau"
+                                : "OpenAlex tạm thời không khả dụng. Hãy thử lại sau";
+
+                throw new IllegalStateException(message, exception);
+        }
+
+        private boolean isTemporaryConnectionFailure(Throwable exception) {
+                Throwable current = exception;
+
+                while (current != null) {
+                        if (current instanceof TimeoutException
+                                        || current instanceof org.springframework.web.reactive.function.client.WebClientRequestException) {
+                                return true;
+                        }
+
+                        Throwable cause = current.getCause();
+
+                        if (cause == current) {
+                                break;
+                        }
+
+                        current = cause;
+                }
+
+                return false;
         }
 
         private void sleepBeforeRetry(int attempt) {
