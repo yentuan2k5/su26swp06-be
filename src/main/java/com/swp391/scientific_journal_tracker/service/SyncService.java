@@ -31,6 +31,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -56,6 +58,7 @@ public class SyncService {
     private final AuthorRepository authorRepository;
     private final ApiDataSourceRepository apiDataSourceRepository;
     private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
+    private final ConcurrentMap<Long, AtomicBoolean> cancellationSignals = new ConcurrentHashMap<>();
 
     @Value("${openalex.sync.field-ids:17}")
     private String openAlexFieldIds;
@@ -74,6 +77,34 @@ public class SyncService {
      */
     public SyncLogResponse syncFromOpenAlex() {
         return runExclusive("sync", this::doSyncFromOpenAlex);
+    }
+
+    public SyncLogResponse cancelSync(long syncLogId) {
+        SyncLog syncLog = syncLogRepository.findById(syncLogId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Sync job " + syncLogId + " was not found."));
+
+        if (syncLog.getStatus() != Status.RUNNING) {
+            return SyncLogResponse.from(syncLog);
+        }
+
+        AtomicBoolean cancellationSignal = cancellationSignals.get(syncLogId);
+        if (cancellationSignal != null) {
+            cancellationSignal.set(true);
+            log.info("Cancellation requested for active sync job {}", syncLogId);
+            return finishCancelled(
+                    syncLog,
+                    syncLog.getPaperSynced() == null ? 0 : syncLog.getPaperSynced(),
+                    "Cancellation requested by an administrator.");
+        }
+
+        log.warn(
+                "Closing orphaned RUNNING sync log {} because no active worker owns it.",
+                syncLogId);
+        return finishCancelled(
+                syncLog,
+                syncLog.getPaperSynced() == null ? 0 : syncLog.getPaperSynced(),
+                "Cancelled by an administrator; no active worker was attached to this job.");
     }
 
     private SyncLogResponse runExclusive(
@@ -115,11 +146,13 @@ public class SyncService {
         syncLog.setStartedAt(syncStartedAt);
         syncLog.setPaperSynced(0);
         syncLog = syncLogRepository.save(syncLog);
+        AtomicBoolean cancellationSignal = registerCancellationSignal(syncLog);
 
         int totalSynced = 0;
         int totalFailed = 0;
 
         try {
+            checkCancellation(cancellationSignal);
             ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
 
             /*
@@ -140,6 +173,7 @@ public class SyncService {
                     fromCreatedDate);
 
             for (String fieldId : fieldIds) {
+                checkCancellation(cancellationSignal);
                 String filter = buildIncrementalFieldFilter(
                         fieldId,
                         fromCreatedDate);
@@ -153,6 +187,7 @@ public class SyncService {
                 List<Map<String, Object>> papers = openAlexClient.fetchWorksByFilter(
                         filter,
                         limit);
+                checkCancellation(cancellationSignal);
 
                 if (papers.isEmpty()) {
                     log.warn(
@@ -162,6 +197,7 @@ public class SyncService {
                 }
 
                 for (Map<String, Object> paperData : papers) {
+                    checkCancellation(cancellationSignal);
                     try {
                         boolean isNewPaper = processOpenAlexWork(
                                 paperData,
@@ -187,6 +223,8 @@ public class SyncService {
                     }
                 }
             }
+
+            checkCancellation(cancellationSignal);
 
             /*
              * Chỉ tiến mốc đồng bộ khi không có paper nào bị lỗi.
@@ -230,6 +268,9 @@ public class SyncService {
             // Return cho trường hợp sync chạy xong bình thường.
             return SyncLogResponse.from(savedLog);
 
+        } catch (SyncCancelledException exception) {
+            log.info("Sync OpenAlex cancelled after {} new papers.", totalSynced);
+            return finishCancelled(syncLog, totalSynced, exception.getMessage());
         } catch (Exception exception) {
             log.error(
                     "Sync OpenAlex thất bại. Root cause: {}",
@@ -251,6 +292,8 @@ public class SyncService {
             SyncLog savedLog = syncLogRepository.save(syncLog);
 
             return SyncLogResponse.from(savedLog);
+        } finally {
+            cancellationSignals.remove(syncLog.getSyncLogId(), cancellationSignal);
         }
     }
 
@@ -320,14 +363,17 @@ public class SyncService {
         syncLog.setStartedAt(backfillStartedAt);
         syncLog.setPaperSynced(0);
         syncLog = syncLogRepository.save(syncLog);
+        AtomicBoolean cancellationSignal = registerCancellationSignal(syncLog);
 
         AtomicInteger totalSynced = new AtomicInteger(0);
         AtomicInteger totalFailed = new AtomicInteger(0);
 
         try {
+            checkCancellation(cancellationSignal);
             ApiDataSource openAlexSource = getOrCreateOpenAlexDataSource();
 
             for (String fieldId : safeFieldIds) {
+                checkCancellation(cancellationSignal);
                 String filter = buildBackfillFilter(
                         fieldId,
                         fromYear,
@@ -343,6 +389,7 @@ public class SyncService {
                         safeMaxResultsPerConcept,
                         papers -> {
                             for (Map<String, Object> paperData : papers) {
+                                checkCancellation(cancellationSignal);
                                 try {
                                     boolean isNewPaper = processOpenAlexWork(
                                             paperData,
@@ -368,7 +415,10 @@ public class SyncService {
                                             exception);
                                 }
                             }
+                            checkCancellation(cancellationSignal);
                         });
+
+                checkCancellation(cancellationSignal);
 
                 if (fetchedForField == 0) {
                     log.warn(
@@ -406,6 +456,11 @@ public class SyncService {
 
             return SyncLogResponse.from(savedLog);
 
+        } catch (SyncCancelledException exception) {
+            log.info(
+                    "Backfill OpenAlex cancelled after {} new papers.",
+                    totalSynced.get());
+            return finishCancelled(syncLog, totalSynced.get(), exception.getMessage());
         } catch (Exception exception) {
             log.error(
                     "Backfill OpenAlex thất bại. Root cause: {}",
@@ -423,6 +478,42 @@ public class SyncService {
             SyncLog savedLog = syncLogRepository.save(syncLog);
 
             return SyncLogResponse.from(savedLog);
+        } finally {
+            cancellationSignals.remove(syncLog.getSyncLogId(), cancellationSignal);
+        }
+    }
+
+    private AtomicBoolean registerCancellationSignal(SyncLog syncLog) {
+        AtomicBoolean cancellationSignal = new AtomicBoolean(false);
+        cancellationSignals.put(syncLog.getSyncLogId(), cancellationSignal);
+
+        syncLogRepository.findById(syncLog.getSyncLogId())
+                .filter(current -> current.getStatus() == Status.CANCELLED)
+                .ifPresent(current -> cancellationSignal.set(true));
+
+        return cancellationSignal;
+    }
+
+    private void checkCancellation(AtomicBoolean cancellationSignal) {
+        if (cancellationSignal.get() || Thread.currentThread().isInterrupted()) {
+            throw new SyncCancelledException("Cancelled by an administrator.");
+        }
+    }
+
+    private SyncLogResponse finishCancelled(
+            SyncLog syncLog,
+            int paperSynced,
+            String message) {
+        syncLog.setStatus(Status.CANCELLED);
+        syncLog.setPaperSynced(Math.max(0, paperSynced));
+        syncLog.setErrorMessage(message);
+        syncLog.setFinishedAt(LocalDateTime.now());
+        return SyncLogResponse.from(syncLogRepository.save(syncLog));
+    }
+
+    private static final class SyncCancelledException extends RuntimeException {
+        private SyncCancelledException(String message) {
+            super(message);
         }
     }
 

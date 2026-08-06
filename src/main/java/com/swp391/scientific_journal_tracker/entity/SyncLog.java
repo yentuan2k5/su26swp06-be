@@ -35,7 +35,8 @@ public class SyncLog {
     public enum Status {
         RUNNING,
         SUCCESS,
-        FAILED
+        FAILED,
+        CANCELLED
     }
 
     @Column(name = "PaperSynced", nullable = false, columnDefinition = "INT DEFAULT 0")
