@@ -16,6 +16,8 @@ public class MindMapEdgeResponse {
     private String trendStatus;
     private double associationScore;
     private double rankScore;
+    /** STRONG: it nhat 3 paper chung; LIMITED: 1-2 paper chung. */
+    private String evidenceLevel;
 
     public MindMapEdgeResponse(String sourceId, String targetId, String relation) {
         this.sourceId = sourceId;
@@ -34,6 +36,22 @@ public class MindMapEdgeResponse {
             String trendStatus,
             double associationScore,
             double rankScore) {
+        this(sourceId, targetId, relation, sharedPaperCount, recentSharedPaperCount,
+                previousSharedPaperCount, growthRate, trendStatus, associationScore, rankScore, "STRONG");
+    }
+
+    public MindMapEdgeResponse(
+            String sourceId,
+            String targetId,
+            String relation,
+            long sharedPaperCount,
+            long recentSharedPaperCount,
+            long previousSharedPaperCount,
+            double growthRate,
+            String trendStatus,
+            double associationScore,
+            double rankScore,
+            String evidenceLevel) {
         this(sourceId, targetId, relation);
         this.sharedPaperCount = sharedPaperCount;
         this.recentSharedPaperCount = recentSharedPaperCount;
@@ -42,5 +60,6 @@ public class MindMapEdgeResponse {
         this.trendStatus = trendStatus;
         this.associationScore = associationScore;
         this.rankScore = rankScore;
+        this.evidenceLevel = evidenceLevel;
     }
 }

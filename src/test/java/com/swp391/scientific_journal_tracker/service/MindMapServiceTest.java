@@ -65,6 +65,8 @@ class MindMapServiceTest {
         assertEquals(2, response.getNodes().size());
         assertEquals("RELATED_TOPIC", response.getEdges().getFirst().getRelation());
         assertEquals(20L, response.getEdges().getFirst().getSharedPaperCount());
+        assertEquals("STRONG", response.getEdges().getFirst().getEvidenceLevel());
+        assertEquals("STRONG", response.getLanes().getFirst().getEvidenceLevel());
         assertEquals(2022, response.getFromYear());
         assertEquals(2026, response.getToYear());
     }
@@ -74,6 +76,35 @@ class MindMapServiceTest {
         assertThrows(
                 BadRequestException.class,
                 () -> mindMapService.getMindMap("JOURNAL", 1L, 5));
+    }
+
+    @Test
+    void returnsLimitedEvidenceWhenNoRelationReachesStrongThreshold() {
+        Keyword keyword = new Keyword();
+        keyword.setKeywordId(7L);
+        keyword.setTerm("Sparse concept");
+
+        when(keywordRepository.findById(7L)).thenReturn(Optional.of(keyword));
+        when(researchPaperRepository.getKeywordMindMapStats(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class)))
+                .thenReturn(new Object[] { 2L, 2L, 0L });
+        when(researchPaperRepository.findMindMapTopicsForKeyword(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class), any(Pageable.class)))
+                .thenReturn(List.<Object[]>of(new Object[] { 11L, "Sparse Topic", 2L, 2L, 0L }));
+        when(researchPaperRepository.findMindMapKeywordsForKeyword(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(researchPaperRepository.findMindMapJournalsForKeyword(
+                eq(7L), any(Integer.class), any(Integer.class), any(Integer.class), any(Integer.class), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        MindMapResponse response = mindMapService.getMindMap("keyword", 7L, 5);
+
+        assertEquals(2, response.getNodes().size());
+        assertEquals(2L, response.getEdges().getFirst().getSharedPaperCount());
+        assertEquals("LIMITED", response.getEdges().getFirst().getEvidenceLevel());
+        assertEquals("LIMITED", response.getLanes().getFirst().getEvidenceLevel());
+        assertEquals("NO_DATA", response.getLanes().get(2).getEvidenceLevel());
     }
 
 }

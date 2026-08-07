@@ -15,6 +15,8 @@ public class MindMapResponse {
     private Integer toYear;
     private Integer previousFromYear;
     private Integer previousToYear;
+    private List<MindMapLaneResponse> lanes;
+    private int minStrongSharedPapers;
 
     /** Constructor cu giu tuong thich cho client dang dung API Mind Map. */
     public MindMapResponse(
@@ -39,5 +41,20 @@ public class MindMapResponse {
         this.toYear = toYear;
         this.previousFromYear = previousFromYear;
         this.previousToYear = previousToYear;
+    }
+
+    public MindMapResponse(
+            MindMapNodeResponse root,
+            List<MindMapNodeResponse> nodes,
+            List<MindMapEdgeResponse> edges,
+            Integer fromYear,
+            Integer toYear,
+            Integer previousFromYear,
+            Integer previousToYear,
+            List<MindMapLaneResponse> lanes,
+            int minStrongSharedPapers) {
+        this(root, nodes, edges, fromYear, toYear, previousFromYear, previousToYear);
+        this.lanes = lanes;
+        this.minStrongSharedPapers = minStrongSharedPapers;
     }
 }

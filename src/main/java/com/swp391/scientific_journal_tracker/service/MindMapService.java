@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.swp391.scientific_journal_tracker.dto.response.MindMapEdgeResponse;
+import com.swp391.scientific_journal_tracker.dto.response.MindMapLaneResponse;
 import com.swp391.scientific_journal_tracker.dto.response.MindMapNodeResponse;
 import com.swp391.scientific_journal_tracker.dto.response.MindMapResponse;
 import com.swp391.scientific_journal_tracker.dto.response.PaperResponse;
@@ -45,6 +46,7 @@ public class MindMapService {
     private static final int CANDIDATE_LIMIT = 50;
     private static final int TREND_PERIOD_YEARS = 5;
     private static final int MIN_SHARED_PAPERS = 3;
+    private static final int MAX_LIMITED_EVIDENCE_NODES = 3;
 
     private final KeywordRepository keywordRepository;
     private final ResearchTopicRepository researchTopicRepository;
@@ -145,44 +147,76 @@ public class MindMapService {
             TrendWindow trendWindow) {
         List<MindMapNodeResponse> nodes = new ArrayList<>();
         List<MindMapEdgeResponse> edges = new ArrayList<>();
+        List<MindMapLaneResponse> lanes = new ArrayList<>();
         nodes.add(root);
 
-        appendBranch(nodes, edges, root, relatedTopics, "RELATED_TOPIC", limit);
-        appendBranch(nodes, edges, root, relatedKeywords, "RELATED_KEYWORD", limit);
-        appendBranch(nodes, edges, root, relatedJournals, "PUBLISHED_IN", limit);
+        lanes.add(appendBranch(nodes, edges, root, MindMapType.TOPIC,
+                relatedTopics, "RELATED_TOPIC", limit));
+        lanes.add(appendBranch(nodes, edges, root, MindMapType.KEYWORD,
+                relatedKeywords, "RELATED_KEYWORD", limit));
+        lanes.add(appendBranch(nodes, edges, root, MindMapType.JOURNAL,
+                relatedJournals, "PUBLISHED_IN", limit));
 
         return new MindMapResponse(
                 root, nodes, edges,
                 trendWindow.recentStartYear(), trendWindow.currentYear(),
-                trendWindow.previousStartYear(), trendWindow.previousEndYear());
+                trendWindow.previousStartYear(), trendWindow.previousEndYear(),
+                lanes, MIN_SHARED_PAPERS);
     }
 
-    private void appendBranch(
+    /**
+     * Uu tien quan he co it nhat MIN_SHARED_PAPERS paper chung. Neu mot nhanh
+     * chua dat nguong nay, van tra toi da vai quan he 1-2 paper chung va danh
+     * dau LIMITED de UI khong bien mat thong tin hay danh dong la bang chung manh.
+     */
+    private MindMapLaneResponse appendBranch(
             List<MindMapNodeResponse> nodes,
             List<MindMapEdgeResponse> edges,
             MindMapNodeResponse root,
+            MindMapType branchType,
             List<RelationCandidate> candidates,
             String relation,
             int limit) {
         Map<Long, Long> catalogCounts = loadCatalogCounts(
-                candidates.isEmpty() ? MindMapType.KEYWORD : candidates.getFirst().type(),
-                candidates.stream().map(RelationCandidate::entityId).toList());
+                branchType, candidates.stream().map(RelationCandidate::entityId).toList());
 
-        candidates.stream()
-                .filter(candidate -> candidate.sharedPaperCount() >= MIN_SHARED_PAPERS)
+        List<Relation> rankedRelations = candidates.stream()
                 .map(candidate -> toRelation(
                         root,
                         candidate,
                         catalogCounts.getOrDefault(candidate.entityId(), candidate.sharedPaperCount()),
-                        relation))
+                        relation,
+                        candidate.sharedPaperCount() >= MIN_SHARED_PAPERS ? "STRONG" : "LIMITED"))
                 .sorted(Comparator.comparingDouble(Relation::rankScore).reversed()
                         .thenComparing(Comparator.comparingLong(Relation::sharedPaperCount).reversed())
                         .thenComparing(item -> item.node().getLabel(), String.CASE_INSENSITIVE_ORDER))
-                .limit(limit)
-                .forEach(item -> {
-                    nodes.add(item.node());
-                    edges.add(item.edge());
-                });
+                .toList();
+
+        List<Relation> strongRelations = rankedRelations.stream()
+                .filter(item -> item.sharedPaperCount() >= MIN_SHARED_PAPERS)
+                .toList();
+        List<Relation> displayedRelations = strongRelations.isEmpty()
+                ? rankedRelations.stream().limit(Math.min(limit, MAX_LIMITED_EVIDENCE_NODES)).toList()
+                : strongRelations.stream().limit(limit).toList();
+
+        displayedRelations.forEach(item -> {
+            nodes.add(item.node());
+            edges.add(item.edge());
+        });
+
+        int limitedCount = Math.max(0, candidates.size() - strongRelations.size());
+        String evidenceLevel = strongRelations.isEmpty()
+                ? (candidates.isEmpty() ? "NO_DATA" : "LIMITED")
+                : "STRONG";
+        return new MindMapLaneResponse(
+                branchType.name(),
+                laneLabel(branchType),
+                candidates.size(),
+                strongRelations.size(),
+                limitedCount,
+                displayedRelations.size(),
+                evidenceLevel,
+                laneMessage(branchType, candidates.size(), strongRelations.size()));
     }
 
     private List<RelationCandidate> toCandidates(MindMapType type, List<Object[]> rows) {
@@ -204,7 +238,8 @@ public class MindMapService {
             MindMapNodeResponse root,
             RelationCandidate candidate,
             long targetCatalogPaperCount,
-            String relation) {
+            String relation,
+            String evidenceLevel) {
         double associationScore = associationScore(
                 candidate.sharedPaperCount(), root.getCatalogPaperCount(), targetCatalogPaperCount);
         double rankScore = associationScore * Math.log1p(candidate.sharedPaperCount());
@@ -225,8 +260,32 @@ public class MindMapService {
                 root.getId(), node.getId(), relation,
                 candidate.sharedPaperCount(),
                 candidate.recentPaperCount(), candidate.previousPaperCount(),
-                growthRate, trendStatus, associationScore, rankScore);
+                growthRate, trendStatus, associationScore, rankScore, evidenceLevel);
         return new Relation(node, edge, rankScore, candidate.sharedPaperCount());
+    }
+
+    private String laneLabel(MindMapType type) {
+        return switch (type) {
+            case TOPIC -> "Topics";
+            case KEYWORD -> "Keywords";
+            case JOURNAL -> "Journals";
+        };
+    }
+
+    private String laneMessage(MindMapType type, int candidateCount, int strongCandidateCount) {
+        String entity = switch (type) {
+            case TOPIC -> "topic";
+            case KEYWORD -> "keyword";
+            case JOURNAL -> "journal";
+        };
+        if (candidateCount == 0) {
+            return "No indexed " + entity + " is linked to this research root.";
+        }
+        if (strongCandidateCount == 0) {
+            return "Only limited evidence is available: each displayed " + entity
+                    + " has fewer than " + MIN_SHARED_PAPERS + " shared papers.";
+        }
+        return "Ranked by shared papers and normalized association strength.";
     }
 
     private MindMapNodeResponse toRootNode(MindMapType type, Long entityId, String label, Object[] stats) {
