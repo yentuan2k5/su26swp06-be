@@ -93,8 +93,8 @@ public class DashboardReportService {
         String keyword = normalize(request.getKeyword());
         String topic = normalize(request.getTopic());
         DashboardSummaryResponse summary = buildReportSummary(
-                null,
-                null,
+                keyword,
+                topic,
                 fromYear,
                 sections);
         DashboardReportChartsResponse charts = buildReportCharts(
@@ -194,14 +194,29 @@ public class DashboardReportService {
         content.append("Preferred format: ").append(resolveFormat(request.getFormat())).append("\n");
         content.append("Selected sections: ").append(formatSections(sections)).append("\n\n");
 
+        String keyword = normalize(request.getKeyword());
+        String topic = normalize(request.getTopic());
+        if (keyword != null) {
+            content.append("Keyword filter: ").append(keyword).append("\n");
+        }
+        if (topic != null) {
+            content.append("Topic filter: ").append(topic).append("\n");
+        }
+        if (keyword != null || topic != null) {
+            content.append("\n");
+        }
+
         if (sections.contains(SECTION_OVERALL_STATISTICS)) {
             content.append(sectionNumber++).append(". Overall statistics\n");
             content.append("- Total papers: ").append(summary.getTotalPapers()).append("\n");
             content.append("- Total journals: ").append(summary.getTotalJournals()).append("\n");
             content.append("- Total keywords: ").append(summary.getTotalKeywords()).append("\n");
             content.append("- OpenAlex papers: ").append(summary.getOpenAlexPapers()).append("\n");
-            content.append("- Successful syncs: ").append(summary.getSuccessfulSyncs()).append("\n");
-            content.append("- Failed syncs: ").append(summary.getFailedSyncs()).append("\n\n");
+            if (keyword == null && topic == null) {
+                content.append("- Successful syncs: ").append(summary.getSuccessfulSyncs()).append("\n");
+                content.append("- Failed syncs: ").append(summary.getFailedSyncs()).append("\n");
+            }
+            content.append("\n");
         }
 
         if (sections.contains(SECTION_PAPERS_BY_YEAR)) {
@@ -220,13 +235,11 @@ public class DashboardReportService {
             appendTopCitedPapers(content, sectionNumber++ + ". Top cited papers", charts.getTopCitedPapers());
         }
 
-        String keyword = normalize(request.getKeyword());
         if (sections.contains(SECTION_KEYWORD_TREND) && keyword != null) {
             content.append(sectionNumber++).append(". Keyword trend: ").append(keyword).append("\n");
             appendTrend(content, charts.getKeywordTrend());
         }
 
-        String topic = normalize(request.getTopic());
         if (sections.contains(SECTION_TOPIC_TREND) && topic != null) {
             content.append(sectionNumber++).append(". Topic trend: ").append(topic).append("\n");
             appendTrend(content, charts.getTopicTrend());
@@ -252,15 +265,23 @@ public class DashboardReportService {
     private DashboardReportChartsResponse buildReportChartsFromContent(String content) {
         Set<String> sections = extractReportSections(content);
         Integer fromYear = extractReportFromYear(content);
-        String keyword = extractReportFilter(content, "Keyword trend: ");
-        String topic = extractReportFilter(content, "Topic trend: ");
+        String keyword = extractReportFilter(content, "Keyword filter: ");
+        String topic = extractReportFilter(content, "Topic filter: ");
+
+        // Tương thích các report cũ chưa lưu filter ở phần header.
+        if (keyword == null) {
+            keyword = extractReportFilter(content, "Keyword trend: ");
+        }
+        if (topic == null) {
+            topic = extractReportFilter(content, "Topic trend: ");
+        }
 
         return buildReportCharts(
                 keyword,
                 topic,
                 buildReportSummary(
-                        null,
-                        null,
+                        keyword,
+                        topic,
                         fromYear,
                         sections),
                 sections,

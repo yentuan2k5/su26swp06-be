@@ -26,6 +26,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TopicService {
 
+        private static final int MAX_SUGGESTION_PAGE_SIZE = 20;
+
         private final ResearchTopicRepository researchTopicRepository;
         private final ResearchPaperRepository researchPaperRepository;
         private final UserRepository userRepository;
@@ -33,6 +35,33 @@ public class TopicService {
         @Transactional(readOnly = true)
         public List<TopicResponse> getAllTopics() {
                 return researchTopicRepository.findAllTopicSummaries()
+                                .stream()
+                                .map(this::toTopicResponse)
+                                .toList();
+        }
+
+        /**
+         * Tìm topic dạng autocomplete để frontend chỉ tải một nhóm nhỏ kết quả
+         * phù hợp thay vì toàn bộ danh mục topic.
+         *
+         * @param query chuỗi người dùng đang nhập
+         * @param page  trang kết quả, bắt đầu từ 0
+         * @param size  số kết quả mỗi trang, tối đa 20
+         * @return topic có tên hoặc mô tả chứa query
+         */
+        @Transactional(readOnly = true)
+        public List<TopicResponse> getTopicSuggestions(String query, int page, int size) {
+                if (query == null || query.isBlank()) {
+                        return List.of();
+                }
+
+                int safePage = Math.max(0, page);
+                int safeSize = Math.max(1, Math.min(size, MAX_SUGGESTION_PAGE_SIZE));
+
+                return researchTopicRepository
+                                .findTopicSuggestionSummaries(
+                                                query.trim(),
+                                                PageRequest.of(safePage, safeSize))
                                 .stream()
                                 .map(this::toTopicResponse)
                                 .toList();

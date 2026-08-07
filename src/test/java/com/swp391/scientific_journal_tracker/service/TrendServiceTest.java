@@ -59,4 +59,25 @@ class TrendServiceTest {
                 2023,
                 2025));
     }
+
+    @Test
+    void allowsComparisonWithFiveSeries() {
+        List<String> normalizedNames = List.of("alpha", "beta", "gamma", "delta", "epsilon");
+        when(researchPaperRepository.getKeywordComparisonTrends(
+                eq(normalizedNames), eq(2023), eq(2023)))
+                .thenReturn(List.of(
+                        new Object[] { "alpha", 2023, 1L },
+                        new Object[] { "beta", 2023, 1L },
+                        new Object[] { "gamma", 2023, 1L },
+                        new Object[] { "delta", 2023, 1L },
+                        new Object[] { "epsilon", 2023, 1L }));
+
+        TrendComparisonResponse response = trendService.compareTrends(
+                "KEYWORD",
+                List.of("Alpha", "Beta", "Gamma", "Delta", "Epsilon"),
+                2023,
+                2023);
+
+        assertEquals(5, response.getSeries().size());
+    }
 }

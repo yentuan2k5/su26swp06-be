@@ -93,7 +93,7 @@ public class TrendController {
      * &items=deep%20learning&fromYear=2023&toYear=2025
      *
      * @param type     KEYWORD hoặc TOPIC
-     * @param items    từ 2 đến 4 tên keyword/topic, truyền lặp lại trên query string
+     * @param items    từ 2 đến 5 tên keyword/topic, truyền lặp lại trên query string
      * @param fromYear năm bắt đầu, có thể để trống
      * @param toYear   năm kết thúc, có thể để trống
      * @return các series có cùng trục năm để frontend vẽ biểu đồ so sánh

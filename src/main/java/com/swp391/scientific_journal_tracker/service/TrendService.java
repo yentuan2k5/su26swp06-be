@@ -37,7 +37,7 @@ public class TrendService {
 
         private static final int DEFAULT_TREND_PERIOD_YEARS = 5;
         private static final int MIN_COMPARE_ITEMS = 2;
-        private static final int MAX_COMPARE_ITEMS = 4;
+        private static final int MAX_COMPARE_ITEMS = 5;
         private static final String TREND_TYPE_GROWING = "GROWING";
         private static final String TREND_TYPE_EMERGING = "EMERGING";
 
@@ -209,7 +209,7 @@ public class TrendService {
         }
 
         /**
-         * So sánh xu hướng công bố của từ hai đến bốn keyword hoặc topic trong
+         * So sánh xu hướng công bố của từ hai đến năm keyword hoặc topic trong
          * cùng một khoảng năm. Mỗi series luôn có đủ các năm trong khoảng đã
          * chọn; năm không có bài được trả về paperCount = 0 để frontend vẽ
          * biểu đồ nhiều đường trên cùng một trục thời gian.
@@ -379,7 +379,7 @@ public class TrendService {
 
         private LinkedHashMap<String, String> normalizeComparisonNames(List<String> itemNames) {
                 if (itemNames == null) {
-                        throw new BadRequestException("Cần chọn từ 2 đến 4 keyword hoặc topic để so sánh");
+                        throw new BadRequestException("Cần chọn từ 2 đến 5 keyword hoặc topic để so sánh");
                 }
 
                 LinkedHashMap<String, String> requestedNames = new LinkedHashMap<>();
@@ -392,7 +392,7 @@ public class TrendService {
                 if (requestedNames.size() < MIN_COMPARE_ITEMS
                                 || requestedNames.size() > MAX_COMPARE_ITEMS) {
                         throw new BadRequestException(
-                                        "Cần chọn từ 2 đến 4 keyword hoặc topic khác nhau để so sánh");
+                                        "Cần chọn từ 2 đến 5 keyword hoặc topic khác nhau để so sánh");
                 }
 
                 return requestedNames;

@@ -18,4 +18,16 @@ public class KeywordController {
     public List<KeywordResponse> getAllKeywords() {
         return keywordService.getAllKeywords();
     }
+
+    /**
+     * API autocomplete keyword. Dùng cho ô tìm kiếm trend/compare để tránh tải
+     * toàn bộ keyword của catalog xuống trình duyệt.
+     */
+    @GetMapping("/suggestions")
+    public List<KeywordResponse> getKeywordSuggestions(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return keywordService.getKeywordSuggestions(q, page, size);
+    }
 }

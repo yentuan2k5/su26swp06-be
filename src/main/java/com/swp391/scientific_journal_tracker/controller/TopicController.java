@@ -43,6 +43,18 @@ public class TopicController {
         return topicService.searchTopics(keyword);
     }
 
+    /**
+     * API autocomplete topic. Giới hạn kết quả theo trang để phục vụ tìm kiếm
+     * trong Trend/Compare mà không tải toàn bộ topic xuống frontend.
+     */
+    @GetMapping("/suggestions")
+    public List<TopicResponse> getTopicSuggestions(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return topicService.getTopicSuggestions(q, page, size);
+    }
+
     @GetMapping("/trending")
     @PreAuthorize("hasAnyRole('LECTURER', 'RESEARCHER', 'ADMIN')")
     public List<TopTopicResponse> getTrendingTopics(

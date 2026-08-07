@@ -73,6 +73,25 @@ public interface ResearchTopicRepository extends JpaRepository<ResearchTopic, Lo
             FROM ResearchTopic t
             LEFT JOIN t.researchPapers p
             LEFT JOIN t.followers f
+            WHERE LOWER(t.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(COALESCE(t.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            GROUP BY t.researchTopicId, t.name, t.description
+            ORDER BY t.name ASC
+            """)
+    List<Object[]> findTopicSuggestionSummaries(
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
+    @Query("""
+            SELECT
+                t.researchTopicId,
+                t.name,
+                t.description,
+                COUNT(DISTINCT p),
+                COUNT(DISTINCT f)
+            FROM ResearchTopic t
+            LEFT JOIN t.researchPapers p
+            LEFT JOIN t.followers f
             WHERE t.researchTopicId = :topicId
             GROUP BY t.researchTopicId, t.name, t.description
             """)

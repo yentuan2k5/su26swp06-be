@@ -91,7 +91,7 @@ class DashboardReportServiceTest {
     }
 
     @Test
-    void keywordTrendDoesNotFilterTheGeneralCatalogSummary() {
+    void keywordFilterScopesTheEntireReportSummary() {
         User researcher = new User();
         researcher.setUserId(20L);
         researcher.setUsername("researcher");
@@ -103,11 +103,11 @@ class DashboardReportServiceTest {
         request.setSections(List.of("OVERALL_STATISTICS", "KEYWORD_TREND"));
 
         when(userRepository.findByUsername("researcher")).thenReturn(Optional.of(researcher));
-        when(researchPaperRepository.countReportPapers(null, null, null)).thenReturn(100L);
-        when(researchPaperRepository.countReportJournals(null, null, null)).thenReturn(12L);
-        when(researchPaperRepository.countReportKeywords(null, null, null)).thenReturn(25L);
-        when(researchPaperRepository.countReportPapersBySource("openalex", null, null, null))
-                .thenReturn(80L);
+        when(researchPaperRepository.countReportPapers(null, "machine learning", null)).thenReturn(4L);
+        when(researchPaperRepository.countReportJournals(null, "machine learning", null)).thenReturn(2L);
+        when(researchPaperRepository.countReportKeywords(null, "machine learning", null)).thenReturn(8L);
+        when(researchPaperRepository.countReportPapersBySource("openalex", null, "machine learning", null))
+                .thenReturn(4L);
         when(researchPaperRepository.countReportPapersByYear(null, "machine learning", null))
                 .thenReturn(List.<Object[]>of(new Object[] { 2025, 4L }));
         when(dashboardReportRepository.save(any(DashboardReport.class)))
@@ -117,9 +117,10 @@ class DashboardReportServiceTest {
                 request,
                 new UsernamePasswordAuthenticationToken("researcher", null));
 
-        assertTrue(response.getContent().contains("Total papers: 100"));
-        assertTrue(response.getContent().contains("OpenAlex papers: 80"));
-        verify(researchPaperRepository).countReportPapers(null, null, null);
+        assertTrue(response.getContent().contains("Keyword filter: machine learning"));
+        assertTrue(response.getContent().contains("Total papers: 4"));
+        assertTrue(response.getContent().contains("OpenAlex papers: 4"));
+        verify(researchPaperRepository).countReportPapers(null, "machine learning", null);
         verify(researchPaperRepository).countReportPapersByYear(null, "machine learning", null);
     }
 }
