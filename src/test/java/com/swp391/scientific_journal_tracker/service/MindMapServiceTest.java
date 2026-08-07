@@ -64,6 +64,9 @@ class MindMapServiceTest {
         assertEquals("GROWING", response.getRoot().getTrendStatus());
         assertEquals(2, response.getNodes().size());
         assertEquals("RELATED_TOPIC", response.getEdges().getFirst().getRelation());
+        assertEquals(20L, response.getEdges().getFirst().getSharedPaperCount());
+        assertEquals(2022, response.getFromYear());
+        assertEquals(2026, response.getToYear());
     }
 
     @Test

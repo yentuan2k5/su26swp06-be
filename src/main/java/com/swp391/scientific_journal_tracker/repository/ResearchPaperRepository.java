@@ -915,4 +915,78 @@ public interface ResearchPaperRepository extends JpaRepository<ResearchPaper, Lo
             @Param("previousStartYear") int previousStartYear,
             @Param("previousEndYear") int previousEndYear,
             Pageable pageable);
+
+    /** Dem quy mo catalog cua cac node de chuan hoa trong so canh Mind Map. */
+    @Query("""
+            SELECT k.keywordId, COUNT(DISTINCT p)
+            FROM ResearchPaper p JOIN p.keywords k
+            WHERE k.keywordId IN :keywordIds
+            GROUP BY k.keywordId
+            """)
+    List<Object[]> countPapersByKeywordIds(@Param("keywordIds") List<Long> keywordIds);
+
+    @Query("""
+            SELECT t.researchTopicId, COUNT(DISTINCT p)
+            FROM ResearchPaper p JOIN p.researchTopics t
+            WHERE t.researchTopicId IN :topicIds
+            GROUP BY t.researchTopicId
+            """)
+    List<Object[]> countPapersByTopicIds(@Param("topicIds") List<Long> topicIds);
+
+    @Query("""
+            SELECT p.journalId, COUNT(DISTINCT p)
+            FROM ResearchPaper p
+            WHERE p.journalId IN :journalIds
+            GROUP BY p.journalId
+            """)
+    List<Object[]> countPapersByJournalIds(@Param("journalIds") List<Long> journalIds);
+
+    /** Tra ve cac paper lam bang chung cho mot quan he Mind Map. */
+    @Query("""
+            SELECT DISTINCT p FROM ResearchPaper p
+            JOIN p.keywords rootKeyword JOIN p.keywords targetKeyword
+            WHERE rootKeyword.keywordId = :rootId AND targetKeyword.keywordId = :targetId
+            """)
+    Page<ResearchPaper> findMindMapEvidenceKeywordToKeyword(
+            @Param("rootId") Long rootId, @Param("targetId") Long targetId, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p FROM ResearchPaper p
+            JOIN p.keywords rootKeyword JOIN p.researchTopics targetTopic
+            WHERE rootKeyword.keywordId = :rootId AND targetTopic.researchTopicId = :targetId
+            """)
+    Page<ResearchPaper> findMindMapEvidenceKeywordToTopic(
+            @Param("rootId") Long rootId, @Param("targetId") Long targetId, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p FROM ResearchPaper p
+            JOIN p.keywords rootKeyword
+            WHERE rootKeyword.keywordId = :rootId AND p.journalId = :targetId
+            """)
+    Page<ResearchPaper> findMindMapEvidenceKeywordToJournal(
+            @Param("rootId") Long rootId, @Param("targetId") Long targetId, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p FROM ResearchPaper p
+            JOIN p.researchTopics rootTopic JOIN p.researchTopics targetTopic
+            WHERE rootTopic.researchTopicId = :rootId AND targetTopic.researchTopicId = :targetId
+            """)
+    Page<ResearchPaper> findMindMapEvidenceTopicToTopic(
+            @Param("rootId") Long rootId, @Param("targetId") Long targetId, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p FROM ResearchPaper p
+            JOIN p.researchTopics rootTopic JOIN p.keywords targetKeyword
+            WHERE rootTopic.researchTopicId = :rootId AND targetKeyword.keywordId = :targetId
+            """)
+    Page<ResearchPaper> findMindMapEvidenceTopicToKeyword(
+            @Param("rootId") Long rootId, @Param("targetId") Long targetId, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p FROM ResearchPaper p
+            JOIN p.researchTopics rootTopic
+            WHERE rootTopic.researchTopicId = :rootId AND p.journalId = :targetId
+            """)
+    Page<ResearchPaper> findMindMapEvidenceTopicToJournal(
+            @Param("rootId") Long rootId, @Param("targetId") Long targetId, Pageable pageable);
 }
