@@ -154,7 +154,7 @@ class DashboardServiceTest {
         assertTrue(response.getCapabilities().isCanGenerateBasicReport());
         assertFalse(response.getCapabilities().isCanGenerateAdvancedReport());
         assertFalse(response.getCapabilities().isCanCompareTrends());
-        assertEquals("BASIC", response.getCapabilities().getMindMapAccess());
+        assertEquals("NONE", response.getCapabilities().getMindMapAccess());
         verify(syncLogRepository, never()).countByStatus(org.mockito.ArgumentMatchers.any());
     }
 

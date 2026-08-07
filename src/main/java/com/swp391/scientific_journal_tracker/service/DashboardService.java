@@ -77,9 +77,7 @@ public class DashboardService {
         boolean canViewResearchAnalytics = role != User.Role.STUDENT;
         boolean isResearcherOrAdmin = role == User.Role.RESEARCHER || role == User.Role.ADMIN;
         boolean isAdmin = role == User.Role.ADMIN;
-        String mindMapAccess = role == User.Role.STUDENT
-                ? "NONE"
-                : (isResearcherOrAdmin ? "FULL" : "BASIC");
+        String mindMapAccess = isResearcherOrAdmin ? "FULL" : "NONE";
 
         DashboardCapabilitiesResponse capabilities = new DashboardCapabilitiesResponse(
                 canViewResearchAnalytics,
