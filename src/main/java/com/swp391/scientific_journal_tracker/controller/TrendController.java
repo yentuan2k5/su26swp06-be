@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.swp391.scientific_journal_tracker.dto.response.TopKeywordResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TrendAnalysisResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
 import com.swp391.scientific_journal_tracker.security.ResearchAccessLevel;
 import com.swp391.scientific_journal_tracker.security.ResearchAccessPolicy;
@@ -64,6 +65,39 @@ public class TrendController {
             @RequestParam String topic) {
         return ResponseEntity.ok(
                 trendService.getTrendByTopic(topic));
+    }
+
+    /**
+     * Trả về kết quả trend đã tính toán cho một keyword. Student và Lecturer
+     * luôn dùng cửa sổ mặc định; Researcher/Admin được tùy chọn khoảng recent.
+     */
+    @GetMapping("/keyword/analysis")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'RESEARCHER', 'ADMIN')")
+    public ResponseEntity<TrendAnalysisResponse> analyzeKeywordTrend(
+            @RequestParam String keyword,
+            @RequestParam(required = false) Integer fromYear,
+            @RequestParam(required = false) Integer toYear,
+            Authentication authentication) {
+        boolean fullAccess = hasFullTrendAccess(authentication);
+        return ResponseEntity.ok(trendService.analyzeKeywordTrend(
+                keyword,
+                fullAccess ? fromYear : null,
+                fullAccess ? toYear : null));
+    }
+
+    /** Trả về kết quả trend đã tính toán cho một topic. */
+    @GetMapping("/topic/analysis")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'RESEARCHER', 'ADMIN')")
+    public ResponseEntity<TrendAnalysisResponse> analyzeTopicTrend(
+            @RequestParam String topic,
+            @RequestParam(required = false) Integer fromYear,
+            @RequestParam(required = false) Integer toYear,
+            Authentication authentication) {
+        boolean fullAccess = hasFullTrendAccess(authentication);
+        return ResponseEntity.ok(trendService.analyzeTopicTrend(
+                topic,
+                fullAccess ? fromYear : null,
+                fullAccess ? toYear : null));
     }
 
     /**
@@ -149,6 +183,12 @@ public class TrendController {
                 trendService.getTopTrendingKeywords(
                         basicAccess ? null : fromYear,
                         basicAccess ? Math.min(limit, 5) : limit));
+    }
+
+    private boolean hasFullTrendAccess(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_RESEARCHER".equals(authority.getAuthority())
+                        || "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
 }

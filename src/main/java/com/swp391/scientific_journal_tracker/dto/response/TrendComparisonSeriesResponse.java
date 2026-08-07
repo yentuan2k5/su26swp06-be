@@ -16,5 +16,22 @@ public class TrendComparisonSeriesResponse {
     private String name;
     private long totalPapers;
     private double growthRate;
+    private long previousCount;
+    private long recentCount;
+    private double trendScore;
+    private String trendType;
+    private boolean sufficientData;
     private List<TrendResponse> yearlyData;
+
+    /** Constructor cu de giu tuong thich khi client chi dung yearlyData. */
+    public TrendComparisonSeriesResponse(
+            String name,
+            long totalPapers,
+            double growthRate,
+            List<TrendResponse> yearlyData) {
+        this.name = name;
+        this.totalPapers = totalPapers;
+        this.growthRate = growthRate;
+        this.yearlyData = yearlyData;
+    }
 }

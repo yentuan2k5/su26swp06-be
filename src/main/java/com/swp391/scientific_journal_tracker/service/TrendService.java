@@ -17,6 +17,7 @@ import com.swp391.scientific_journal_tracker.dto.response.TopKeywordResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonSeriesResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TrendAnalysisResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
 import com.swp391.scientific_journal_tracker.exception.BadRequestException;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
@@ -40,6 +41,9 @@ public class TrendService {
         private static final int MAX_COMPARE_ITEMS = 5;
         private static final String TREND_TYPE_GROWING = "GROWING";
         private static final String TREND_TYPE_EMERGING = "EMERGING";
+        private static final String TREND_TYPE_STABLE = "STABLE";
+        private static final String TREND_TYPE_DECLINING = "DECLINING";
+        private static final String TREND_TYPE_INSUFFICIENT_DATA = "INSUFFICIENT_DATA";
 
         @Value("${trend.min-papers-threshold:30}")
         private int minPapersThreshold;
@@ -49,6 +53,9 @@ public class TrendService {
 
         @Value("${trend.min-recent-papers-for-emerging:30}")
         private int minRecentPapersForEmerging;
+
+        @Value("${trend.stable-growth-rate:0.10}")
+        private double stableGrowthRate;
 
         @Value("${trend.excluded-keywords:computer science}")
         private String excludedKeywords;
@@ -85,6 +92,38 @@ public class TrendService {
                                                 (Integer) row[0],
                                                 ((Number) row[1]).longValue()))
                                 .toList();
+        }
+
+        /**
+         * Phân tích trend của một keyword bằng hai giai đoạn liên tiếp có cùng
+         * độ dài. Số lượng paper theo năm vẫn được trả về làm bằng chứng cho
+         * biểu đồ, nhưng growthRate và trendScore mới là kết luận xu hướng.
+         */
+        @Transactional(readOnly = true)
+        public TrendAnalysisResponse analyzeKeywordTrend(
+                        String keyword,
+                        Integer recentFromYear,
+                        Integer recentToYear) {
+                return analyzeSingleTrend(
+                                "KEYWORD",
+                                keyword,
+                                getTrendByKeyword(keyword),
+                                recentFromYear,
+                                recentToYear);
+        }
+
+        /** Phân tích trend của một research topic theo cùng công thức keyword. */
+        @Transactional(readOnly = true)
+        public TrendAnalysisResponse analyzeTopicTrend(
+                        String topic,
+                        Integer recentFromYear,
+                        Integer recentToYear) {
+                return analyzeSingleTrend(
+                                "TOPIC",
+                                topic,
+                                getTrendByTopic(topic),
+                                recentFromYear,
+                                recentToYear);
         }
 
         /**
@@ -241,14 +280,18 @@ public class TrendService {
                 LinkedHashMap<String, String> requestedNames = normalizeComparisonNames(itemNames);
                 String safeType = normalizeComparisonType(type);
 
+                int periodYears = safeToYear - safeFromYear + 1;
+                int previousFromYear = safeFromYear - periodYears;
+                validatePreviousPeriod(previousFromYear);
+
                 List<Object[]> rows = "KEYWORD".equals(safeType)
                                 ? researchPaperRepository.getKeywordComparisonTrends(
                                                 new ArrayList<>(requestedNames.keySet()),
-                                                safeFromYear,
+                                                previousFromYear,
                                                 safeToYear)
                                 : researchPaperRepository.getTopicComparisonTrends(
                                                 new ArrayList<>(requestedNames.keySet()),
-                                                safeFromYear,
+                                                previousFromYear,
                                                 safeToYear);
 
                 Map<String, Map<Integer, Long>> countsByNameAndYear = new LinkedHashMap<>();
@@ -332,6 +375,12 @@ public class TrendService {
         private String resolveTrendType(
                         long recentCount,
                         long previousCount) {
+                long totalPapers = recentCount + previousCount;
+                if (totalPapers < Math.max(0, minPapersThreshold)) {
+                        return TREND_TYPE_INSUFFICIENT_DATA;
+                }
+
+                double growthRate = calculateGrowthRate(recentCount, previousCount);
                 int safeMinPreviousPapersThreshold = Math.max(
                                 0,
                                 minPreviousPapersThreshold);
@@ -341,7 +390,15 @@ public class TrendService {
 
                 if (previousCount < safeMinPreviousPapersThreshold
                                 && recentCount >= safeMinRecentPapersForEmerging) {
-                        return TREND_TYPE_EMERGING;
+                                return TREND_TYPE_EMERGING;
+                }
+
+                if (growthRate < -Math.abs(stableGrowthRate)) {
+                        return TREND_TYPE_DECLINING;
+                }
+
+                if (Math.abs(growthRate) <= Math.abs(stableGrowthRate)) {
+                        return TREND_TYPE_STABLE;
                 }
 
                 return TREND_TYPE_GROWING;
@@ -374,6 +431,13 @@ public class TrendService {
                 if (fromYear < 1900 || toYear > currentYear) {
                         throw new BadRequestException(
                                         "Khoảng năm phải nằm trong khoảng từ 1900 đến năm hiện tại");
+                }
+        }
+
+        private void validatePreviousPeriod(int previousFromYear) {
+                if (previousFromYear < 1900) {
+                        throw new BadRequestException(
+                                        "Khoảng năm không đủ dữ liệu để tạo giai đoạn so sánh liền trước");
                 }
         }
 
@@ -417,20 +481,104 @@ public class TrendService {
                         int fromYear,
                         int toYear) {
                 List<TrendResponse> yearlyData = new ArrayList<>();
-                long totalPapers = 0;
+                int periodYears = toYear - fromYear + 1;
+                int previousFromYear = fromYear - periodYears;
+                long previousCount = 0;
+                long recentCount = 0;
                 for (int year = fromYear; year <= toYear; year++) {
                         long paperCount = yearlyCounts.getOrDefault(year, 0L);
-                        totalPapers += paperCount;
+                        recentCount += paperCount;
                         yearlyData.add(new TrendResponse(year, paperCount));
                 }
 
-                long firstYearCount = yearlyCounts.getOrDefault(fromYear, 0L);
-                long lastYearCount = yearlyCounts.getOrDefault(toYear, 0L);
-                return new TrendComparisonSeriesResponse(
+                for (int year = previousFromYear; year < fromYear; year++) {
+                        previousCount += yearlyCounts.getOrDefault(year, 0L);
+                }
+
+                long totalPapers = previousCount + recentCount;
+                TrendComparisonSeriesResponse response = new TrendComparisonSeriesResponse(
                                 name,
                                 totalPapers,
-                                calculateGrowthRate(lastYearCount, firstYearCount),
+                                calculateGrowthRate(recentCount, previousCount),
                                 yearlyData);
+                response.setPreviousCount(previousCount);
+                response.setRecentCount(recentCount);
+                response.setTrendScore(calculateTrendScore(response.getGrowthRate(), totalPapers));
+                response.setTrendType(resolveTrendType(recentCount, previousCount));
+                response.setSufficientData(totalPapers >= Math.max(0, minPapersThreshold));
+                return response;
+        }
+
+        private TrendAnalysisResponse analyzeSingleTrend(
+                        String type,
+                        String name,
+                        List<TrendResponse> allYearlyData,
+                        Integer recentFromYear,
+                        Integer recentToYear) {
+                if (name == null || name.isBlank()) {
+                        throw new BadRequestException(type.toLowerCase() + " không được để trống");
+                }
+
+                int currentYear = Year.now().getValue();
+                int safeRecentToYear = recentToYear == null ? currentYear : recentToYear;
+                int safeRecentFromYear = recentFromYear == null
+                                ? safeRecentToYear - DEFAULT_TREND_PERIOD_YEARS + 1
+                                : recentFromYear;
+                validateComparisonYears(safeRecentFromYear, safeRecentToYear, currentYear);
+
+                int periodYears = safeRecentToYear - safeRecentFromYear + 1;
+                int previousFromYear = safeRecentFromYear - periodYears;
+                int previousToYear = safeRecentFromYear - 1;
+                validatePreviousPeriod(previousFromYear);
+                Map<Integer, Long> countsByYear = allYearlyData.stream()
+                                .collect(Collectors.toMap(
+                                                TrendResponse::getYear,
+                                                TrendResponse::getPaperCount,
+                                                Long::sum));
+
+                long previousCount = sumCounts(countsByYear, previousFromYear, previousToYear);
+                long recentCount = sumCounts(countsByYear, safeRecentFromYear, safeRecentToYear);
+                long totalPapers = previousCount + recentCount;
+                double growthRate = calculateGrowthRate(recentCount, previousCount);
+                List<TrendResponse> yearlyData = buildYearlyData(
+                                countsByYear,
+                                safeRecentFromYear,
+                                safeRecentToYear);
+
+                return new TrendAnalysisResponse(
+                                type,
+                                name.trim(),
+                                previousFromYear,
+                                previousToYear,
+                                safeRecentFromYear,
+                                safeRecentToYear,
+                                previousCount,
+                                recentCount,
+                                totalPapers,
+                                growthRate,
+                                calculateTrendScore(growthRate, totalPapers),
+                                resolveTrendType(recentCount, previousCount),
+                                totalPapers >= Math.max(0, minPapersThreshold),
+                                yearlyData);
+        }
+
+        private long sumCounts(Map<Integer, Long> countsByYear, int fromYear, int toYear) {
+                long total = 0;
+                for (int year = fromYear; year <= toYear; year++) {
+                        total += countsByYear.getOrDefault(year, 0L);
+                }
+                return total;
+        }
+
+        private List<TrendResponse> buildYearlyData(
+                        Map<Integer, Long> countsByYear,
+                        int fromYear,
+                        int toYear) {
+                List<TrendResponse> yearlyData = new ArrayList<>();
+                for (int year = fromYear; year <= toYear; year++) {
+                        yearlyData.add(new TrendResponse(year, countsByYear.getOrDefault(year, 0L)));
+                }
+                return yearlyData;
         }
 
         private double calculateGrowthRate(
