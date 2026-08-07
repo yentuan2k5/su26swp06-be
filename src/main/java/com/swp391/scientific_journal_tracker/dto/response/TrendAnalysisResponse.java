@@ -9,8 +9,9 @@ import lombok.NoArgsConstructor;
 /**
  * Kết quả phân tích xu hướng của một keyword hoặc topic.
  *
- * yearlyData là dữ liệu nền để vẽ biểu đồ. Kết luận xu hướng được suy ra từ
- * hai giai đoạn liên tiếp có cùng độ dài: previous và recent.
+ * yearlyData là số paper nền để đối chiếu. yearlyGrowthData là dữ liệu đã
+ * tính toán để vẽ biểu đồ trend theo tỷ lệ tăng/giảm từng năm. Kết luận xu
+ * hướng tổng thể được suy ra từ hai giai đoạn liên tiếp: previous và recent.
  */
 @Data
 @NoArgsConstructor
@@ -30,4 +31,5 @@ public class TrendAnalysisResponse {
     private String trendType;
     private boolean sufficientData;
     private List<TrendResponse> yearlyData;
+    private List<TrendGrowthPointResponse> yearlyGrowthData;
 }

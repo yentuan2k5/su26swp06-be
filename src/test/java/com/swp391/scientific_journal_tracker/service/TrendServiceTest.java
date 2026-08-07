@@ -120,5 +120,12 @@ class TrendServiceTest {
         assertEquals("GROWING", response.getTrendType());
         assertTrue(response.isSufficientData());
         assertEquals(2, response.getYearlyData().size());
+        assertEquals(2, response.getYearlyGrowthData().size());
+        assertEquals(10L, response.getYearlyGrowthData().get(0).getPreviousPaperCount());
+        assertEquals(15L, response.getYearlyGrowthData().get(0).getPaperCount());
+        assertEquals(0.5, response.getYearlyGrowthData().get(0).getGrowthRate());
+        assertEquals(15L, response.getYearlyGrowthData().get(1).getPreviousPaperCount());
+        assertEquals(25L, response.getYearlyGrowthData().get(1).getPaperCount());
+        assertEquals(2.0 / 3.0, response.getYearlyGrowthData().get(1).getGrowthRate());
     }
 }

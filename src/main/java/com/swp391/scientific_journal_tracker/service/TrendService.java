@@ -18,6 +18,7 @@ import com.swp391.scientific_journal_tracker.dto.response.TopTopicResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendComparisonSeriesResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendAnalysisResponse;
+import com.swp391.scientific_journal_tracker.dto.response.TrendGrowthPointResponse;
 import com.swp391.scientific_journal_tracker.dto.response.TrendResponse;
 import com.swp391.scientific_journal_tracker.exception.BadRequestException;
 import com.swp391.scientific_journal_tracker.repository.ResearchPaperRepository;
@@ -544,6 +545,10 @@ public class TrendService {
                                 countsByYear,
                                 safeRecentFromYear,
                                 safeRecentToYear);
+                List<TrendGrowthPointResponse> yearlyGrowthData = buildYearlyGrowthData(
+                                countsByYear,
+                                safeRecentFromYear,
+                                safeRecentToYear);
 
                 return new TrendAnalysisResponse(
                                 type,
@@ -559,7 +564,8 @@ public class TrendService {
                                 calculateTrendScore(growthRate, totalPapers),
                                 resolveTrendType(recentCount, previousCount),
                                 totalPapers >= Math.max(0, minPapersThreshold),
-                                yearlyData);
+                                yearlyData,
+                                yearlyGrowthData);
         }
 
         private long sumCounts(Map<Integer, Long> countsByYear, int fromYear, int toYear) {
@@ -579,6 +585,31 @@ public class TrendService {
                         yearlyData.add(new TrendResponse(year, countsByYear.getOrDefault(year, 0L)));
                 }
                 return yearlyData;
+        }
+
+        /**
+         * Tạo chuỗi dữ liệu đã tính cho biểu đồ trend. Mỗi điểm là mức thay
+         * đổi của năm hiện tại so với năm liền trước, thay vì chỉ là số paper
+         * thô. Số paper vẫn được đính kèm để client hiển thị tooltip và kiểm
+         * chứng kết quả tính toán.
+         */
+        private List<TrendGrowthPointResponse> buildYearlyGrowthData(
+                        Map<Integer, Long> countsByYear,
+                        int fromYear,
+                        int toYear) {
+                List<TrendGrowthPointResponse> growthData = new ArrayList<>();
+                for (int year = fromYear; year <= toYear; year++) {
+                        long previousPaperCount = countsByYear.getOrDefault(year - 1, 0L);
+                        long paperCount = countsByYear.getOrDefault(year, 0L);
+                        double growthRate = calculateGrowthRate(paperCount, previousPaperCount);
+                        growthData.add(new TrendGrowthPointResponse(
+                                        year,
+                                        previousPaperCount,
+                                        paperCount,
+                                        growthRate,
+                                        calculateTrendScore(growthRate, paperCount + previousPaperCount)));
+                }
+                return growthData;
         }
 
         private double calculateGrowthRate(
