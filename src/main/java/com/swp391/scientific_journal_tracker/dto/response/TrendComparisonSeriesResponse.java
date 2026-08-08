@@ -23,6 +23,12 @@ public class TrendComparisonSeriesResponse {
     private boolean sufficientData;
     private List<TrendResponse> yearlyData;
 
+    /**
+     * Chuỗi tăng trưởng theo từng năm của series. growthRate dùng dạng thập
+     * phân, ví dụ 0.25 tương ứng tăng 25% so với năm trước.
+     */
+    private List<TrendGrowthPointResponse> yearlyGrowthData;
+
     /** Constructor cu de giu tuong thich khi client chi dung yearlyData. */
     public TrendComparisonSeriesResponse(
             String name,

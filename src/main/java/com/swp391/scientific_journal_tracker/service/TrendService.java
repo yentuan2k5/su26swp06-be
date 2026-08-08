@@ -497,6 +497,10 @@ public class TrendService {
                 }
 
                 long totalPapers = previousCount + recentCount;
+                List<TrendGrowthPointResponse> yearlyGrowthData = buildYearlyGrowthData(
+                                yearlyCounts,
+                                fromYear,
+                                toYear);
                 TrendComparisonSeriesResponse response = new TrendComparisonSeriesResponse(
                                 name,
                                 totalPapers,
@@ -507,6 +511,7 @@ public class TrendService {
                 response.setTrendScore(calculateTrendScore(response.getGrowthRate(), totalPapers));
                 response.setTrendType(resolveTrendType(recentCount, previousCount));
                 response.setSufficientData(totalPapers >= Math.max(0, minPapersThreshold));
+                response.setYearlyGrowthData(yearlyGrowthData);
                 return response;
         }
 
